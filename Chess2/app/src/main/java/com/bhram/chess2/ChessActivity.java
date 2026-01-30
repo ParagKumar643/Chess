@@ -34,6 +34,8 @@ public class ChessActivity extends AppCompatActivity {
     private TextView gameStatusText;
 
     private Button resetButton;
+    private Button backButton;
+    private Button forwardButton;
 
     private ImageView floatingPiece;
 
@@ -73,6 +75,8 @@ public class ChessActivity extends AppCompatActivity {
         gameStatusText = findViewById(R.id.gameStatusText);
 
         resetButton = findViewById(R.id.resetButton);
+        backButton = findViewById(R.id.backButton);
+        forwardButton = findViewById(R.id.forwardButton);
 
         player1NameText = findViewById(R.id.player1Name);
         player2NameText = findViewById(R.id.player2Name);
@@ -92,6 +96,8 @@ public class ChessActivity extends AppCompatActivity {
         updateBoard();
 
         resetButton.setOnClickListener(v -> resetGame());
+        backButton.setOnClickListener(v -> goBackMove());
+        forwardButton.setOnClickListener(v -> goForwardMove());
 
         updateUI();
         
@@ -163,27 +169,69 @@ public class ChessActivity extends AppCompatActivity {
         startPlayerClock(Piece.Color.WHITE);
         Toast.makeText(this, "New game", Toast.LENGTH_SHORT).show();
     }
+    
+    private void goBackMove() {
+        if (game.canGoBack()) {
+            // Debug: Log current state before going back
+            System.out.println("DEBUG: Before goBack - currentMoveIndex: " + (game.isNavigating() ? "navigating" : "not navigating"));
+            System.out.println("DEBUG: Before goBack - moveHistory size: " + game.getMoveHistory().size());
+            
+            game.goBack();
+            
+            // Debug: Log state after going back
+            System.out.println("DEBUG: After goBack - currentMoveIndex: " + (game.isNavigating() ? "navigating" : "not navigating"));
+            System.out.println("DEBUG: After goBack - moveHistory size: " + game.getMoveHistory().size());
+            
+            updateBoard();
+            updateUI();
+            // Show the correct move number - if navigating, show the move index + 1
+            int moveNumber = game.isNavigating() ? (game.getCurrentMoveNumber() - 1) : (game.getCurrentMoveNumber() - 1);
+            Toast.makeText(this, "Moved back to move " + moveNumber, Toast.LENGTH_SHORT).show();
+            // Debug toast to show move history
+            Toast.makeText(this, game.getMoveHistoryDebug(), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Cannot go back further - " + game.getMoveHistoryDebug(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void goForwardMove() {
+        if (game.canGoForward()) {
+            game.goForward();
+            updateBoard();
+            updateUI();
+            Toast.makeText(this, "Moved forward to move " + game.getCurrentMoveNumber(), Toast.LENGTH_SHORT).show();
+            // Debug toast to show move history
+            Toast.makeText(this, game.getMoveHistoryDebug(), Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Cannot go forward further - " + game.getMoveHistoryDebug(), Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void exitNavigation() {
+        game.exitNavigation();
+        updateBoard();
+        updateUI();
+    }
 
     private void onSquareClick(int row, int col) {
+        // If in navigation mode, clicking anywhere exits navigation
+        if (game.isNavigating()) {
+            exitNavigation();
+            return;
+        }
 
         if (game.isGameOver()) {
-
             return;
-
         }
 
         if (game.isPieceSelected()) {
-
             // Track the move for animation
             lastMoveFrom = new int[]{game.getSelectedRow(), game.getSelectedCol()};
-
             lastMoveTo = new int[]{row, col};
             boolean moveSuccessful = game.movePiece(row, col);
 
             if (moveSuccessful) {
-
                 updateBoard();
-
                 updateUI();
 
                 if (game.isGameOver()) {
@@ -191,18 +239,12 @@ public class ChessActivity extends AppCompatActivity {
                 } else {
                     switchPlayer();
                 }
-
             } else {
-
                 // If move failed, try to select a different piece
                 Piece clickedPiece = game.getPiece(row, col);
-
                 if (clickedPiece != null && clickedPiece.getColor() == game.getCurrentPlayer()) {
-
                     game.selectPiece(row, col);
-
                     updateBoard();
-
                 } else {
                     game.deselectPiece();
                     updateBoard();
@@ -210,13 +252,11 @@ public class ChessActivity extends AppCompatActivity {
                 // Deselect if clicking on invalid square
                 lastMoveFrom = null;
                 lastMoveTo = null;
-
             }
         } else {
             boolean selected = game.selectPiece(row, col);
             if (selected) {
                 updateBoard();
-
             } else {
                 Toast.makeText(this, "Select your piece", Toast.LENGTH_SHORT).show();
             }
@@ -331,7 +371,7 @@ public class ChessActivity extends AppCompatActivity {
                     }
 
                     // Show shadow on opponent pieces that can be captured as overlay
-                    if (isValidMove && piece.getColor() != game.getCurrentPlayer()) {
+                    if (isValidMove && piece.getColor() != game.getCurrentPlayerForUI()) {
                         // Create a combined drawable with piece image and circle overlay
                         square.setImageDrawable(createPieceWithShadowDrawable(piece));
                     }
@@ -354,35 +394,21 @@ public class ChessActivity extends AppCompatActivity {
 
 
     private void updateUI() {
-
-        String player = game.getCurrentPlayer() == Piece.Color.WHITE ? "White" : "Black";
-
+        String player = game.getCurrentPlayerForUI() == Piece.Color.WHITE ? "White" : "Black";
         currentPlayerText.setText("Current Player: " + player);
 
         if (game.isGameOver()) {
-
             gameStatusText.setText("Game Over! " + game.getWinner());
-
             gameStatusText.setTextColor(Color.parseColor("#FF4444"));
-
             resetButton.setEnabled(true);
-
             stopClock();
-
         } else if (game.isInCheck()) {
-
             gameStatusText.setText(player + " is in CHECK!");
-
             gameStatusText.setTextColor(Color.parseColor("#FF6600"));
-
             resetButton.setEnabled(true);
-
         } else {
-
             gameStatusText.setText("");
-
             resetButton.setEnabled(true);
-
         }
     }
 
