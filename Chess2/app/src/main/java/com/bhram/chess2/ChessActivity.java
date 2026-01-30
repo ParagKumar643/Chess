@@ -283,6 +283,8 @@ public class ChessActivity extends AppCompatActivity {
         game.exitNavigation();
         updateBoard();
         updateUI();
+    }
+    
     // Save current board state for capture detection
     private void saveBoardState() {
         for (int row = 0; row < 8; row++) {
@@ -532,35 +534,6 @@ public class ChessActivity extends AppCompatActivity {
                                     break;
                             }
                         }
-                            break;
-                        case BISHOP:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.bishop_black);
-                            } else {
-                                square.setImageResource(R.drawable.bishop_white);
-                            }
-                            break;
-                        case QUEEN:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.queen_black);
-                            } else {
-                                square.setImageResource(R.drawable.queen_white);
-                            }
-                            break;
-                        case KING:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.king_black);
-                            } else {
-                                square.setImageResource(R.drawable.king_white);
-                            }
-                            break;
-                    }
-
-                    // Show shadow on opponent pieces that can be captured as overlay
-                    if (isValidMove && piece.getColor() != game.getCurrentPlayerForUI()) {
-                        // Create a combined drawable with piece image and circle overlay
-                        square.setImageDrawable(createPieceWithShadowDrawable(piece));
-                    }
 
                         if (isNewPosition) {
                             pieceView.setAlpha(0f);
