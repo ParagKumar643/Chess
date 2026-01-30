@@ -38,7 +38,7 @@ public class ChessActivity extends AppCompatActivity {
     private ImageView floatingPiece;
 
 
-    private int[] lastMoveFrom= null;
+    private int[] lastMoveFrom = null;
 
     private int[] lastMoveTo = null;
 
@@ -86,7 +86,8 @@ public class ChessActivity extends AppCompatActivity {
 
                 final int finalCol = col;
 
-                TextView square = new TextView(this);
+                // Use ImageView for all squares to support both images and text
+                ImageView square = new ImageView(this);
 
                 GridLayout.LayoutParams params = new GridLayout.LayoutParams();
 
@@ -101,6 +102,7 @@ public class ChessActivity extends AppCompatActivity {
                 params.rowSpec = GridLayout.spec(row);
 
                 square.setLayoutParams(params);
+                square.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 
                 boolean isWhiteSquare = (row + col) % 2 == 0;
 
@@ -109,12 +111,6 @@ public class ChessActivity extends AppCompatActivity {
                 int darkSquare = Color.parseColor("#858863");
 
                 square.setBackgroundColor(isWhiteSquare ? lightSquare : darkSquare);
-
-                square.setGravity(Gravity.CENTER);
-
-                square.setTextSize(24);
-
-                square.setTypeface(null, android.graphics.Typeface.BOLD);
 
                 square.setOnClickListener(v -> onSquareClick(finalRow, finalCol));
 
@@ -211,75 +207,93 @@ public class ChessActivity extends AppCompatActivity {
 
             View child = chessBoard.getChildAt(i);
 
-            if (child instanceof TextView) {
-
-                TextView square = (TextView) child;
+            if (child instanceof ImageView) {
+                ImageView square = (ImageView) child;
 
                 int row = i / 8;
-
                 int col = i % 8;
 
                 boolean isWhiteSquare = (row + col) % 2 == 0;
-
                 int lightSquare = Color.parseColor("#F0D9B5");
-
                 int darkSquare = Color.parseColor("#858863");
-
                 int baseColor = isWhiteSquare ? lightSquare : darkSquare;
 
-
                 boolean isValidMove = false;
-
                 if (validMoves != null) {
-
                     for (int[] move : validMoves) {
-
                         if (move[0] == row && move[1] == col) {
-
                             isValidMove = true;
                             break;
-
                         }
-
                     }
-
                 }
 
                 if (game.isPieceSelected() &&
-
                         game.getSelectedRow() == row &&
-
                         game.getSelectedCol() == col) {
-
                     square.setBackgroundColor(Color.parseColor("#FFD700"));
-
                 } else if (isValidMove) {
-
-                    square.setBackgroundColor(Color.parseColor("#90EE98"));
-
+                    // Create a black circle for valid move indicators
+                    square.setImageDrawable(createBlackCircleDrawable());
+                    // Keep the original board color, don't change background
                 } else {
-
                     square.setBackgroundColor(baseColor);
-
                 }
 
                 Piece piece = game.getPiece(row, col);
+                boolean isNewPosition = lastMoveTo != null && lastMoveTo[0] == row && lastMoveTo[1] == col;
 
                 if (piece != null) {
+                    // Display appropriate piece image based on type and color
+                    switch (piece.getType()) {
+                        case PAWN:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.pawn_black);
+                            } else {
+                                square.setImageResource(R.drawable.pawn_white);
+                            }
+                            break;
+                        case ROOK:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.rook_black);
+                            } else {
+                                square.setImageResource(R.drawable.rook_white);
+                            }
+                            break;
+                        case KNIGHT:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.knight_black);
+                            } else {
+                                square.setImageResource(R.drawable.knight_white);
+                            }
+                            break;
+                        case BISHOP:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.bishop_black);
+                            } else {
+                                square.setImageResource(R.drawable.bishop_white);
+                            }
+                            break;
+                        case QUEEN:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.queen_black);
+                            } else {
+                                square.setImageResource(R.drawable.queen_white);
+                            }
+                            break;
+                        case KING:
+                            if (piece.getColor() == Piece.Color.BLACK) {
+                                square.setImageResource(R.drawable.king_black);
+                            } else {
+                                square.setImageResource(R.drawable.king_white);
+                            }
+                            break;
+                    }
 
-                    String pieceInitial = getPieceInitial(piece);
-
-                    boolean isNewPosition = lastMoveTo != null && lastMoveTo[0] == row && lastMoveTo[1] == col;
-
-                    square.setText(pieceInitial);
-
-
-                    if (piece.getColor() == Piece.Color.WHITE) {
-                        square.setTextColor(Color.WHITE);
-                        square.setShadowLayer(4, 2, 2, Color.BLACK);
-                    } else {
-                        square.setTextColor(Color.BLACK);
-                        square.setShadowLayer(0, 0, 0, Color.TRANSPARENT);
+                    // Show shadow on opponent pieces that can be captured as overlay
+                    if (isValidMove && piece.getColor() != game.getCurrentPlayer()) {
+                        // Create a combined drawable with piece image and circle overlay
+                        square.setImageDrawable(createPieceWithShadowDrawable(piece));
                     }
 
                     if (isNewPosition) {
@@ -288,36 +302,16 @@ public class ChessActivity extends AppCompatActivity {
                         fadeIn.setDuration(200);
                         fadeIn.start();
                     }
-
+                } else if (isValidMove) {
+                    // Show black circle for valid moves on empty squares
+                    square.setImageDrawable(createBlackCircleDrawable());
                 } else {
-                    square.setText("");
+                    square.setImageResource(0);
                 }
-
             }
-
         }
     }
 
-
-    private String getPieceInitial(Piece piece) {
-        switch (piece.getType()) {
-
-            case PAWN:
-                return "P";
-            case ROOK:
-                return "R";
-            case KNIGHT:
-                return "N";
-            case BISHOP:
-                return "B";
-            case QUEEN:
-                return "Q";
-            case KING:
-                return "K";
-            default:
-                return "P";
-        }
-    }
 
     private void updateUI() {
 
@@ -362,5 +356,100 @@ public class ChessActivity extends AppCompatActivity {
 
             Toast.makeText(this, "Game Over! " + winner + " wins!", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private android.graphics.drawable.Drawable createBlackCircleDrawable() {
+        // Create a simple dark grey filled circle drawable for empty squares
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(60, 60, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setColor(Color.parseColor("#333333")); // Dark grey color
+        paint.setAntiAlias(true);
+        paint.setStyle(android.graphics.Paint.Style.FILL);
+        
+        int radius = 20; // Circle radius
+        int centerX = canvas.getWidth() / 2;
+        int centerY = canvas.getHeight() / 2;
+        
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bitmap);
+    }
+
+    private android.graphics.drawable.Drawable createPieceWithShadowDrawable(Piece piece) {
+        // Create a combined drawable with piece image and circle overlay
+        int boardSize = (int) (40 * getResources().getDisplayMetrics().density);
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(boardSize, boardSize, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+        
+        // Draw the piece image at full size
+        android.graphics.drawable.Drawable pieceDrawable = null;
+        switch (piece.getType()) {
+            case PAWN:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.pawn_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.pawn_white);
+                }
+                break;
+            case ROOK:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.rook_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.rook_white);
+                }
+                break;
+            case KNIGHT:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.knight_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.knight_white);
+                }
+                break;
+            case BISHOP:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.bishop_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.bishop_white);
+                }
+                break;
+            case QUEEN:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.queen_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.queen_white);
+                }
+                break;
+            case KING:
+                if (piece.getColor() == Piece.Color.BLACK) {
+                    pieceDrawable = getResources().getDrawable(R.drawable.king_black);
+                } else {
+                    pieceDrawable = getResources().getDrawable(R.drawable.king_white);
+                }
+                break;
+        }
+        
+        if (pieceDrawable != null) {
+            // Draw the piece image at full canvas size to prevent shrinking
+            pieceDrawable.setBounds(0, 0, boardSize, boardSize);
+            pieceDrawable.draw(canvas);
+        }
+        
+        // Draw the dark grey circular outline overlay in the center
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setColor(Color.parseColor("#333333")); // Dark grey color
+        paint.setAntiAlias(true);
+        paint.setAlpha(180); // Semi-transparent
+        paint.setStyle(android.graphics.Paint.Style.STROKE);
+        paint.setStrokeWidth(8); // Increased line thickness
+        
+        int radius = boardSize / 2 - 10; // Larger radius to cover the image completely
+        int centerX = canvas.getWidth() / 2;
+        int centerY = canvas.getHeight() / 2;
+        
+        canvas.drawCircle(centerX, centerY, radius, paint);
+        
+        return new android.graphics.drawable.BitmapDrawable(getResources(), bitmap);
     }
 }

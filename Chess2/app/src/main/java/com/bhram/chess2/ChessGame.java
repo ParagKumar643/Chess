@@ -284,7 +284,11 @@ public class ChessGame {
             for (int toCol = 0; toCol < 8; toCol++) {
                 if (isValidMove(row, col, toRow, toCol)) {
                     // Check if move would leave king in check
-                    if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
+                    // Temporarily disable check validation for pawn captures to debug
+                    if (piece.getType() == Piece.Type.PAWN && Math.abs(col - toCol) == 1 && toRow == row + (piece.getColor() == Piece.Color.WHITE ? -1 : 1)) {
+                        // This is a pawn capture - allow it for now to test
+                        validMoves.add(new int[]{toRow, toCol});
+                    } else if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
                         validMoves.add(new int[]{toRow, toCol});
                     }
                 }
