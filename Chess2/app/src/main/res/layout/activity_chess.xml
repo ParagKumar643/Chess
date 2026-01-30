@@ -77,7 +77,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_marginTop="12dp"
-        app:layout_constraintTop_toBottomOf="@id/resetButton"
+        app:layout_constraintTop_toBottomOf="@id/gameStatusText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -172,6 +172,46 @@
             android:gravity="end|center_vertical"
             android:paddingEnd="16dp"
             android:elevation="4dp" />
+    </LinearLayout>
+
+    <!-- ===== BUTTONS BELOW PLAYER 1 ===== -->
+
+    <LinearLayout
+        android:id="@+id/navigationButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@id/player1Bar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <Button
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Back"
+            android:textStyle="bold"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="#884513" />
+
+        <Button
+            android:id="@+id/resetButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="New Game"
+            android:textStyle="bold"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="#884513" />
+
+        <Button
+            android:id="@+id/forwardButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Forward"
+            android:textStyle="bold"
+            android:backgroundTint="#884513" />
     </LinearLayout>
 
     <!-- Floating piece -->
