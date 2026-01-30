@@ -56,6 +56,18 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <Button
+        android:id="@+id/resetButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="New Game"
+        android:textStyle="bold"
+        android:layout_marginTop="6dp"
+        android:backgroundTint="#884513"
+        app:layout_constraintTop_toBottomOf="@id/gameStatusText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <!-- ===== PLAYER 2 (ABOVE BOARD) ===== -->
 
     <LinearLayout
@@ -101,23 +113,24 @@
             android:elevation="4dp" />
     </LinearLayout>
 
-    <!-- ===== CHESS BOARD ===== -->
-
-    <!-- ===== PLAYER 1 (BELOW BOARD) ===== -->
+    <!-- ===== CHESS BOARD (RESPONSIVE) ===== -->
 
     <GridLayout
         android:id="@+id/chessBoard"
-        android:layout_width="312dp"
-        android:layout_height="315dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:layout_margin="8dp"
-        android:layout_marginTop="8dp"
         android:background="#000000"
         android:columnCount="8"
+
         android:rowCount="8"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.494"
+        app:layout_constraintTop_toBottomOf="@id/player2Bar"
+        app:layout_constraintBottom_toTopOf="@id/player1Bar"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/player2Bar" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintDimensionRatio="1:1" />
+
+    <!-- ===== PLAYER 1 (BELOW BOARD) ===== -->
 
     <LinearLayout
         android:id="@+id/player1Bar"
