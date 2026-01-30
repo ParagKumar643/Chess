@@ -90,6 +90,14 @@ public class ChessGame {
     public String getWinner() {
         return winner;
     }
+    
+    public void setWinner(String winner) {
+        this.winner = winner;
+    }
+    
+    public void setGameOver(boolean gameOver) {
+        this.gameOver = gameOver;
+    }
 
     public boolean selectPiece(int row, int col) {
         if (gameOver) {

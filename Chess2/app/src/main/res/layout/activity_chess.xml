@@ -7,6 +7,8 @@
     android:background="#201810"
     tools:context=".ChessActivity">
 
+    <!-- ===== TOP UI ===== -->
+
     <TextView
         android:id="@+id/chessTitle"
         android:layout_width="wrap_content"
@@ -15,7 +17,7 @@
         android:textSize="28sp"
         android:textStyle="bold"
         android:textColor="#FFD700"
-        android:layout_marginTop="5dp"
+        android:layout_marginTop="12dp"
         android:shadowColor="#000000"
         android:shadowRadius="4"
         app:layout_constraintTop_toTopOf="parent"
@@ -62,24 +64,117 @@
         android:textSize="14sp"
         android:textStyle="bold"
         android:padding="8dp"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="6dp"
         android:backgroundTint="#884513"
         app:layout_constraintTop_toBottomOf="@id/gameStatusText"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- ===== PLAYER 2 (ABOVE BOARD) ===== -->
+
+    <LinearLayout
+        android:id="@+id/player2Bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="12dp"
+        app:layout_constraintTop_toBottomOf="@id/resetButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/player2Name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Player 2 (Black)"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:paddingStart="16dp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/player2Clock"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="05:00"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/clock_background"
+            android:padding="12dp"
+            android:gravity="end|center_vertical"
+            android:paddingEnd="16dp"
+            android:elevation="4dp" />
+    </LinearLayout>
+
+    <!-- ===== CHESS BOARD ===== -->
+
     <GridLayout
         android:id="@+id/chessBoard"
         android:layout_width="320dp"
         android:layout_height="320dp"
-        android:layout_margin="12dp"
+        android:layout_margin="8dp"
         android:columnCount="8"
         android:rowCount="8"
         android:background="#000000"
-        app:layout_constraintTop_toBottomOf="@id/resetButton"
+        app:layout_constraintTop_toBottomOf="@id/player2Bar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- ===== PLAYER 1 (BELOW BOARD) ===== -->
+
+    <LinearLayout
+        android:id="@+id/player1Bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp"
+        app:layout_constraintTop_toBottomOf="@id/chessBoard"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/player1Name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Player 1 (White)"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:paddingStart="16dp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/player1Clock"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="05:00"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/clock_background"
+            android:padding="12dp"
+            android:gravity="end|center_vertical"
+            android:paddingEnd="16dp"
+            android:elevation="4dp" />
+    </LinearLayout>
+
+    <!-- Floating piece -->
     <ImageView
         android:id="@+id/floatingPiece"
         android:layout_width="40dp"

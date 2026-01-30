@@ -37,6 +37,21 @@ public class ChessActivity extends AppCompatActivity {
 
     private ImageView floatingPiece;
 
+    private TextView player1NameText;
+    private TextView player2NameText;
+    private TextView player1ClockText;
+    private TextView player2ClockText;
+
+    private android.os.Handler clockHandler;
+
+    private Runnable clockRunnable;
+
+    private long player1Time = 60000; // 1 minute in milliseconds
+    private long player2Time = 60000; // 1 minute in milliseconds
+
+    private boolean isClockRunning = false;
+    private Piece.Color currentPlayerInClock;
+
 
     private int[] lastMoveFrom= null;
 
@@ -59,6 +74,19 @@ public class ChessActivity extends AppCompatActivity {
 
         resetButton = findViewById(R.id.resetButton);
 
+        player1NameText = findViewById(R.id.player1Name);
+        player2NameText = findViewById(R.id.player2Name);
+        player1ClockText = findViewById(R.id.player1Clock);
+        player2ClockText = findViewById(R.id.player2Clock);
+
+        clockHandler = new android.os.Handler();
+
+        player1NameText.setText("Player 1 (White)");
+        player2NameText.setText("Player 2 (Black)");
+        
+        // Initialize clocks
+        updatePlayerClocks();
+
         initializeBoard();
 
         updateBoard();
@@ -66,6 +94,9 @@ public class ChessActivity extends AppCompatActivity {
         resetButton.setOnClickListener(v -> resetGame());
 
         updateUI();
+        
+        // Start White's clock immediately when game starts
+        startPlayerClock(Piece.Color.WHITE);
     }
 
     private void initializeBoard() {
@@ -127,6 +158,9 @@ public class ChessActivity extends AppCompatActivity {
         initializeBoard();
         updateBoard();
         updateUI();
+        resetPlayerClocks();
+        // Start White's clock first when game starts
+        startPlayerClock(Piece.Color.WHITE);
         Toast.makeText(this, "New game", Toast.LENGTH_SHORT).show();
     }
 
@@ -154,6 +188,8 @@ public class ChessActivity extends AppCompatActivity {
 
                 if (game.isGameOver()) {
                     showGameOverMessage();
+                } else {
+                    switchPlayer();
                 }
 
             } else {
@@ -331,6 +367,8 @@ public class ChessActivity extends AppCompatActivity {
 
             resetButton.setEnabled(true);
 
+            stopClock();
+
         } else if (game.isInCheck()) {
 
             gameStatusText.setText(player + " is in CHECK!");
@@ -360,6 +398,132 @@ public class ChessActivity extends AppCompatActivity {
 
             Toast.makeText(this, "Game Over! " + winner + " wins!", Toast.LENGTH_LONG).show();
         }
+        
+        stopClock();
+    }
+    
+    private void switchPlayer() {
+        // Stop current player's clock
+        stopClock();
+        
+        // Determine which player's clock should be running
+        currentPlayerInClock = game.getCurrentPlayer();
+        
+        // Update UI to reflect the current player
+        updateUI();
+        
+        // Start the appropriate player's clock
+        startPlayerClock(currentPlayerInClock);
+    }
+    
+    private void startPlayerClock(Piece.Color player) {
+        if (!isClockRunning) {
+            isClockRunning = true;
+            currentPlayerInClock = player;
+            clockRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (player == Piece.Color.WHITE) {
+                        if (player1Time > 0) {
+                            player1Time -= 1000; // Decrease by 1 second
+                            updatePlayerClocks();
+                            
+                            if (player1Time <= 0) {
+                                player1Time = 0;
+                                handleTimeUp();
+                            } else {
+                                clockHandler.postDelayed(this, 1000);
+                            }
+                        }
+                    } else {
+                        if (player2Time > 0) {
+                            player2Time -= 1000; // Decrease by 1 second
+                            updatePlayerClocks();
+                            
+                            if (player2Time <= 0) {
+                                player2Time = 0;
+                                handleTimeUp();
+                            } else {
+                                clockHandler.postDelayed(this, 1000);
+                            }
+                        }
+                    }
+                }
+            };
+            clockHandler.post(clockRunnable);
+        }
+    }
+    
+    private void stopClock() {
+        isClockRunning = false;
+        if (clockRunnable != null) {
+            clockHandler.removeCallbacks(clockRunnable);
+        }
+    }
+    
+    private void resetPlayerClocks() {
+        stopClock();
+        player1Time = 60000; // 1 minute
+        player2Time = 60000; // 1 minute
+        updatePlayerClocks();
+    }
+    
+    private void updatePlayerClocks() {
+        // Update Player 1 clock
+        int player1Minutes = (int) (player1Time / 60000);
+        int player1Seconds = (int) ((player1Time % 60000) / 1000);
+        String player1TimeString = String.format("%02d:%02d", player1Minutes, player1Seconds);
+        player1ClockText.setText(player1TimeString);
+        
+        // Update Player 2 clock
+        int player2Minutes = (int) (player2Time / 60000);
+        int player2Seconds = (int) ((player2Time % 60000) / 1000);
+        String player2TimeString = String.format("%02d:%02d", player2Minutes, player2Seconds);
+        player2ClockText.setText(player2TimeString);
+        
+        // Change color when time is low (less than 1 minute)
+        if (player1Time <= 60000) {
+            player1ClockText.setTextColor(Color.parseColor("#FF4444")); // Red color
+            // Add pulsing animation for time pressure
+            animateClock(player1ClockText);
+        } else {
+            player1ClockText.setTextColor(Color.parseColor("#FFFFFF")); // White color
+            player1ClockText.clearAnimation();
+        }
+        
+        if (player2Time <= 60000) {
+            player2ClockText.setTextColor(Color.parseColor("#FF4444")); // Red color
+            // Add pulsing animation for time pressure
+            animateClock(player2ClockText);
+        } else {
+            player2ClockText.setTextColor(Color.parseColor("#FFFFFF")); // White color
+            player2ClockText.clearAnimation();
+        }
+    }
+    
+    private void animateClock(TextView clockText) {
+        // Create a pulsing animation for time pressure
+        android.view.animation.Animation pulse = android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in);
+        pulse.setDuration(500);
+        pulse.setRepeatMode(android.view.animation.Animation.REVERSE);
+        pulse.setRepeatCount(android.view.animation.Animation.INFINITE);
+        clockText.startAnimation(pulse);
+    }
+    
+    private void handleTimeUp() {
+        stopClock();
+        String winner = currentPlayerInClock == Piece.Color.WHITE ? "Black wins on time!" : "White wins on time!";
+        gameStatusText.setText("Time's up! " + winner);
+        gameStatusText.setTextColor(Color.parseColor("#FF4444"));
+        
+        // Show winner message and end game
+        Toast.makeText(this, winner, Toast.LENGTH_LONG).show();
+        
+        // Update game state to reflect the winner
+        game.setWinner(winner);
+        
+        // Disable further moves
+        game.setGameOver(true);
     }
 
     private android.graphics.drawable.Drawable createBlackCircleDrawable() {
