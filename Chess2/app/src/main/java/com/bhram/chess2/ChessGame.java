@@ -1552,4 +1552,25 @@ public class ChessGame {
         // Check if move would leave king in check
         return !wouldBeInCheck(fromRow, fromCol, toRow, toCol, piece.getColor());
     }
+    
+    // Check if a move is a capture
+    public boolean isCaptureMove(int fromRow, int fromCol, int toRow, int toCol) {
+        Piece piece = board[fromRow][fromCol];
+        Piece target = board[toRow][toCol];
+        return piece != null && target != null && target.getColor() != piece.getColor();
+    }
+    
+    // Check if a move is en passant capture
+    public boolean isEnPassantCapture(int fromRow, int fromCol, int toRow, int toCol) {
+        Piece piece = board[fromRow][fromCol];
+        if (piece == null || piece.getType() != Piece.Type.PAWN) {
+            return false;
+        }
+        return canEnPassant(fromRow, fromCol, toRow, toCol);
+    }
+    
+    // Check if the game ended in checkmate
+    public boolean isCheckmate() {
+        return gameOver && winner != null && !winner.equals("Draw") && !winner.contains("time");
+    }
 }

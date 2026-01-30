@@ -1,23 +1,16 @@
 package com.bhram.chess2;
 
 import android.animation.ObjectAnimator;
-
+import android.content.res.Resources;
 import android.graphics.Color;
-
+import android.media.MediaPlayer;
 import android.os.Bundle;
-
 import android.view.Gravity;
-
 import android.view.View;
-
 import android.widget.Button;
-
 import android.widget.GridLayout;
-
 import android.widget.ImageView;
-
 import android.widget.TextView;
-
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -58,6 +51,15 @@ public class ChessActivity extends AppCompatActivity {
     private int[] lastMoveFrom= null;
 
     private int[] lastMoveTo = null;
+    
+    // Track previous board state for capture detection
+    private Piece[][] previousBoardState = new Piece[8][8];
+    private boolean isCaptureMove = false;
+    
+    // Sound player fields
+    private MediaPlayer moveSound;
+    private MediaPlayer captureSound;
+    private MediaPlayer checkmateSound;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,6 +105,9 @@ public class ChessActivity extends AppCompatActivity {
         
         // Start White's clock immediately when game starts
         startPlayerClock(Piece.Color.WHITE);
+        
+        // Initialize sound players
+        initializeSoundPlayers();
     }
 
     private void initializeBoard() {
@@ -211,6 +216,48 @@ public class ChessActivity extends AppCompatActivity {
         game.exitNavigation();
         updateBoard();
         updateUI();
+    // Save current board state for capture detection
+    private void saveBoardState() {
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                previousBoardState[row][col] = game.getPiece(row, col);
+            }
+        }
+    }
+    
+    // Detect if a move was a capture by comparing board states
+    private boolean detectCaptureMove(int fromRow, int fromCol, int toRow, int toCol) {
+        // Check for en passant capture first
+        if (game.isEnPassantCapture(fromRow, fromCol, toRow, toCol)) {
+            android.util.Log.d("ChessSound", "Detected en passant capture");
+            return true;
+        }
+        
+        // Check if the destination square had an opponent's piece before the move
+        Piece previousPieceAtDestination = previousBoardState[toRow][toCol];
+        Piece movingPiece = game.getPiece(toRow, toCol);
+        
+        if (movingPiece != null && previousPieceAtDestination != null) {
+            // If there was a piece at destination and it's different from what's there now,
+            // or if the moving piece is different color from the previous piece
+            if (previousPieceAtDestination.getColor() != movingPiece.getColor()) {
+                android.util.Log.d("ChessSound", "Detected capture: opponent piece was at destination");
+                return true;
+            }
+        }
+        
+        // For pawn captures (diagonal moves), check if it's a capture pattern
+        if (movingPiece != null && movingPiece.getType() == Piece.Type.PAWN) {
+            if (Math.abs(fromCol - toCol) == 1 && fromRow != toRow) {
+                // Pawn moved diagonally - this is a capture move
+                android.util.Log.d("ChessSound", "Detected pawn capture (diagonal move)");
+                return true;
+            }
+        }
+        
+        // If no capture detected, it's a normal move
+        android.util.Log.d("ChessSound", "No capture detected - normal move");
+        return false;
     }
 
     private void onSquareClick(int row, int col) {
@@ -228,9 +275,25 @@ public class ChessActivity extends AppCompatActivity {
             // Track the move for animation
             lastMoveFrom = new int[]{game.getSelectedRow(), game.getSelectedCol()};
             lastMoveTo = new int[]{row, col};
+            
+            // Save current board state before making the move
+            saveBoardState();
+            
             boolean moveSuccessful = game.movePiece(row, col);
 
             if (moveSuccessful) {
+                // Determine if this was a capture move by comparing board states
+                isCaptureMove = detectCaptureMove(game.getSelectedRow(), game.getSelectedCol(), row, col);
+                
+                // Play appropriate sound based on move type
+                if (isCaptureMove) {
+                    android.util.Log.d("ChessSound", "Playing capture sound");
+                    playCaptureSound();
+                } else {
+                    android.util.Log.d("ChessSound", "Playing move sound");
+                    playMoveSound();
+                }
+
                 updateBoard();
                 updateUI();
 
@@ -425,6 +488,11 @@ public class ChessActivity extends AppCompatActivity {
             Toast.makeText(this, "Game Over! " + winner + " wins!", Toast.LENGTH_LONG).show();
         }
         
+        // Play checkmate sound if game ended in checkmate
+        if (game.isCheckmate()) {
+            playCheckmateSound();
+        }
+        
         stopClock();
     }
     
@@ -550,6 +618,74 @@ public class ChessActivity extends AppCompatActivity {
         
         // Disable further moves
         game.setGameOver(true);
+    }
+    
+    private void initializeSoundPlayers() {
+        // Initialize sound players
+        moveSound = MediaPlayer.create(this, R.raw.move_sound);
+        captureSound = MediaPlayer.create(this, R.raw.capture_sound);
+        checkmateSound = MediaPlayer.create(this, R.raw.checkmate_sound);
+    }
+    
+    private void playMoveSound() {
+        android.util.Log.d("ChessSound", "playMoveSound called");
+        if (moveSound != null) {
+            moveSound.stop();
+            moveSound.prepareAsync();
+            moveSound.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    android.util.Log.d("ChessSound", "Starting move sound playback");
+                    mp.start();
+                }
+            });
+        }
+    }
+    
+    private void playCaptureSound() {
+        android.util.Log.d("ChessSound", "playCaptureSound called");
+        if (captureSound != null) {
+            captureSound.stop();
+            captureSound.prepareAsync();
+            captureSound.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    android.util.Log.d("ChessSound", "Starting capture sound playback");
+                    mp.start();
+                }
+            });
+        }
+    }
+    
+    private void playCheckmateSound() {
+        if (checkmateSound != null) {
+            checkmateSound.stop();
+            checkmateSound.prepareAsync();
+            checkmateSound.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mp) {
+                    mp.start();
+                }
+            });
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Release sound resources
+        if (moveSound != null) {
+            moveSound.release();
+            moveSound = null;
+        }
+        if (captureSound != null) {
+            captureSound.release();
+            captureSound = null;
+        }
+        if (checkmateSound != null) {
+            checkmateSound.release();
+            checkmateSound = null;
+        }
     }
 
     private android.graphics.drawable.Drawable createBlackCircleDrawable() {

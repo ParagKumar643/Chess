@@ -103,19 +103,21 @@
 
     <!-- ===== CHESS BOARD ===== -->
 
+    <!-- ===== PLAYER 1 (BELOW BOARD) ===== -->
+
     <GridLayout
         android:id="@+id/chessBoard"
-        android:layout_width="320dp"
-        android:layout_height="320dp"
+        android:layout_width="312dp"
+        android:layout_height="315dp"
         android:layout_margin="8dp"
+        android:layout_marginTop="8dp"
+        android:background="#000000"
         android:columnCount="8"
         android:rowCount="8"
-        android:background="#000000"
-        app:layout_constraintTop_toBottomOf="@id/player2Bar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- ===== PLAYER 1 (BELOW BOARD) ===== -->
+        app:layout_constraintTop_toBottomOf="@id/player2Bar" />
 
     <LinearLayout
         android:id="@+id/player1Bar"
