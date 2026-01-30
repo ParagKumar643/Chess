@@ -7,67 +7,6 @@
     android:background="#201810"
     tools:context=".ChessActivity">
 
-    <!-- ===== TOP UI ===== -->
-
-    <TextView
-        android:id="@+id/chessTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Chess Game"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:textColor="#FFD700"
-        android:layout_marginTop="12dp"
-        android:shadowColor="#000000"
-        android:shadowRadius="4"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <TextView
-        android:id="@+id/currentPlayerText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Current Player: White"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF"
-        android:layout_marginTop="8dp"
-        android:padding="6dp"
-        android:background="#4A3728"
-        android:shadowColor="#000000"
-        android:shadowRadius="2"
-        app:layout_constraintTop_toBottomOf="@id/chessTitle"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <TextView
-        android:id="@+id/gameStatusText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:layout_marginTop="4dp"
-        android:padding="5dp"
-        android:shadowColor="#000000"
-        android:shadowRadius="3"
-        app:layout_constraintTop_toBottomOf="@id/currentPlayerText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <Button
-        android:id="@+id/resetButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="New Game"
-        android:textStyle="bold"
-        android:layout_marginTop="6dp"
-        android:backgroundTint="#884513"
-        app:layout_constraintTop_toBottomOf="@id/gameStatusText"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
     <!-- ===== PLAYER 2 (ABOVE BOARD) ===== -->
 
     <LinearLayout
@@ -77,7 +16,7 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_marginTop="12dp"
-        app:layout_constraintTop_toBottomOf="@id/gameStatusText"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -122,7 +61,6 @@
         android:layout_margin="8dp"
         android:background="#000000"
         android:columnCount="8"
-
         android:rowCount="8"
         app:layout_constraintTop_toBottomOf="@id/player2Bar"
         app:layout_constraintBottom_toTopOf="@id/player1Bar"
@@ -198,15 +136,6 @@
             android:backgroundTint="#884513" />
 
         <Button
-            android:id="@+id/resetButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="New Game"
-            android:textStyle="bold"
-            android:layout_marginEnd="8dp"
-            android:backgroundTint="#884513" />
-
-        <Button
             android:id="@+id/forwardButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -214,6 +143,27 @@
             android:textStyle="bold"
             android:backgroundTint="#884513" />
     </LinearLayout>
+
+    <!-- ===== MOVE HISTORY ===== -->
+    <HorizontalScrollView
+        android:id="@+id/moveHistoryScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="#000000"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/navigationButtons"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:id="@+id/moveHistoryContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical" />
+
+    </HorizontalScrollView>
 
     <!-- Floating piece -->
     <ImageView

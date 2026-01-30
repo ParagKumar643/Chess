@@ -26,9 +26,6 @@ public class ChessActivity extends AppCompatActivity {
     private String[] rows = {"8", "7", "6", "5", "4", "3", "2", "1"};
     
     private ChessGame game;
-    private TextView currentPlayerText;
-    private TextView gameStatusText;
-    private Button resetButton;
     private Button backButton;
     private Button forwardButton;
 
@@ -50,6 +47,8 @@ public class ChessActivity extends AppCompatActivity {
     private MediaPlayer moveSound;
     private MediaPlayer captureSound;
     private MediaPlayer checkmateSound;
+    private LinearLayout moveHistoryContainer;
+    private int moveCounter = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,11 +61,6 @@ public class ChessActivity extends AppCompatActivity {
 
         chessBoard = findViewById(R.id.chessBoard);
 
-        currentPlayerText = findViewById(R.id.currentPlayerText);
-
-        gameStatusText = findViewById(R.id.gameStatusText);
-
-        resetButton = findViewById(R.id.resetButton);
         backButton = findViewById(R.id.backButton);
         forwardButton = findViewById(R.id.forwardButton);
 
@@ -74,6 +68,7 @@ public class ChessActivity extends AppCompatActivity {
         player2NameText = findViewById(R.id.player2Name);
         player1ClockText = findViewById(R.id.player1Clock);
         player2ClockText = findViewById(R.id.player2Clock);
+        moveHistoryContainer = findViewById(R.id.moveHistoryContainer);
 
         clockHandler = new android.os.Handler();
 
@@ -87,12 +82,9 @@ public class ChessActivity extends AppCompatActivity {
 
         updateBoard();
 
-        resetButton.setOnClickListener(v -> resetGame());
         backButton.setOnClickListener(v -> goBackMove());
         forwardButton.setOnClickListener(v -> goForwardMove());
 
-        updateUI();
-        
         // Start White's clock immediately when game starts
         startPlayerClock(Piece.Color.WHITE);
         
@@ -235,10 +227,12 @@ public class ChessActivity extends AppCompatActivity {
         game = new ChessGame();
         initializeBoard();
         updateBoard();
-        updateUI();
         resetPlayerClocks();
         // Start White's clock first when game starts
         startPlayerClock(Piece.Color.WHITE);
+        // Clear move history for new game
+        moveHistoryContainer.removeAllViews();
+        moveCounter = 1;
         Toast.makeText(this, "New game", Toast.LENGTH_SHORT).show();
     }
     
@@ -255,7 +249,6 @@ public class ChessActivity extends AppCompatActivity {
             System.out.println("DEBUG: After goBack - moveHistory size: " + game.getMoveHistory().size());
             
             updateBoard();
-            updateUI();
             // Show the correct move number - if navigating, show the move index + 1
             int moveNumber = game.isNavigating() ? (game.getCurrentMoveNumber() - 1) : (game.getCurrentMoveNumber() - 1);
             Toast.makeText(this, "Moved back to move " + moveNumber, Toast.LENGTH_SHORT).show();
@@ -270,7 +263,6 @@ public class ChessActivity extends AppCompatActivity {
         if (game.canGoForward()) {
             game.goForward();
             updateBoard();
-            updateUI();
             Toast.makeText(this, "Moved forward to move " + game.getCurrentMoveNumber(), Toast.LENGTH_SHORT).show();
             // Debug toast to show move history
             Toast.makeText(this, game.getMoveHistoryDebug(), Toast.LENGTH_LONG).show();
@@ -282,7 +274,6 @@ public class ChessActivity extends AppCompatActivity {
     private void exitNavigation() {
         game.exitNavigation();
         updateBoard();
-        updateUI();
     }
     
     // Save current board state for capture detection
@@ -354,6 +345,10 @@ public class ChessActivity extends AppCompatActivity {
                 // Determine if this was a capture move by comparing board states
                 isCaptureMove = detectCaptureMove(game.getSelectedRow(), game.getSelectedCol(), row, col);
                 
+                // Generate move notation and add to history
+                String moveNotation = generateMoveNotation(game.getSelectedRow(), game.getSelectedCol(), row, col, isCaptureMove);
+                addMoveToHistory(moveNotation);
+                
                 // Play appropriate sound based on move type
                 if (isCaptureMove) {
                     android.util.Log.d("ChessSound", "Playing capture sound");
@@ -364,7 +359,6 @@ public class ChessActivity extends AppCompatActivity {
                 }
 
                 updateBoard();
-                updateUI();
 
                 if (game.isGameOver()) {
                     showGameOverMessage();
@@ -552,26 +546,6 @@ public class ChessActivity extends AppCompatActivity {
         }
     }
 
-
-    private void updateUI() {
-        String player = game.getCurrentPlayerForUI() == Piece.Color.WHITE ? "White" : "Black";
-        currentPlayerText.setText("Current Player: " + player);
-
-        if (game.isGameOver()) {
-            gameStatusText.setText("Game Over! " + game.getWinner());
-            gameStatusText.setTextColor(Color.parseColor("#FF4444"));
-            resetButton.setEnabled(true);
-            stopClock();
-        } else if (game.isInCheck()) {
-            gameStatusText.setText(player + " is in CHECK!");
-            gameStatusText.setTextColor(Color.parseColor("#FF6600"));
-            resetButton.setEnabled(true);
-        } else {
-            gameStatusText.setText("");
-            resetButton.setEnabled(true);
-        }
-    }
-
     private void showGameOverMessage() {
 
         String winner = game.getWinner();
@@ -599,12 +573,90 @@ public class ChessActivity extends AppCompatActivity {
         
         // Determine which player's clock should be running
         currentPlayerInClock = game.getCurrentPlayer();
-        
-        // Update UI to reflect the current player
-        updateUI();
-        
+
         // Start the appropriate player's clock
         startPlayerClock(currentPlayerInClock);
+    }
+    
+    private void addMoveToHistory(String moveNotation) {
+        // Create a TextView for the move
+        TextView moveText = new TextView(this);
+        moveText.setText(moveNotation);
+        moveText.setTextSize(14f);
+        moveText.setTextColor(Color.WHITE);
+        moveText.setPadding(12, 8, 12, 8);
+        moveText.setBackgroundColor(Color.parseColor("#4A3728"));
+        moveText.setGravity(Gravity.CENTER);
+        moveText.setMinWidth(80);
+        moveText.setSingleLine(true);
+        moveText.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        moveText.setPaddingRelative(12, 8, 12, 8);
+        
+        // Add margin between moves for better spacing
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(4, 0, 4, 0);
+        moveText.setLayoutParams(params);
+        
+        // Add to the move history container
+        moveHistoryContainer.addView(moveText);
+    }
+    
+    private String generateMoveNotation(int fromRow, int fromCol, int toRow, int toCol, boolean isCapture) {
+        // Get the piece that was moved
+        Piece movingPiece = game.getPiece(toRow, toCol);
+        if (movingPiece == null) {
+            return ""; // Should not happen for valid moves
+        }
+        
+        // Build the move notation
+        StringBuilder notation = new StringBuilder();
+        
+        // Add move number
+        notation.append("  ").append(moveCounter++).append(".  ");
+
+        // Add piece symbol (except for pawns)
+        if (movingPiece.getType() != Piece.Type.PAWN) {
+            switch (movingPiece.getType()) {
+                case KNIGHT:
+                    // Use Unicode knight symbol (♘ for white, ♞ for black)
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♘" : "♞");
+                    break;
+                case BISHOP:
+                    // Use Unicode bishop symbol (♗ for white, ♝ for black)
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♗" : "♝");
+                    break;
+                case ROOK:
+                    // Use Unicode rook symbol (♖ for white, ♜ for black)
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♖" : "♜");
+                    break;
+                case QUEEN:
+                    // Use Unicode queen symbol (♕ for white, ♛ for black)
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♕" : "♛");
+                    break;
+                case KING:
+                    // Use Unicode king symbol (♔ for white, ♚ for black)
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♔" : "♚");
+                    break;
+            }
+        }
+        
+        // Add destination square
+        notation.append(columns[toCol]).append(rows[toRow]);
+        
+        // Check if the move puts the opponent in check
+        if (game.isInCheck()) {
+            notation.append("+");
+        }
+        
+        // Check if the move results in checkmate
+        if (game.isCheckmate()) {
+            notation.append("#");
+        }
+        
+        return notation.toString();
     }
     
     private void startPlayerClock(Piece.Color player) {
@@ -704,8 +756,6 @@ public class ChessActivity extends AppCompatActivity {
     private void handleTimeUp() {
         stopClock();
         String winner = currentPlayerInClock == Piece.Color.WHITE ? "Black wins on time!" : "White wins on time!";
-        gameStatusText.setText("Time's up! " + winner);
-        gameStatusText.setTextColor(Color.parseColor("#FF4444"));
         
         // Show winner message and end game
         Toast.makeText(this, winner, Toast.LENGTH_LONG).show();
