@@ -3,6 +3,7 @@ package com.bhram.chess2;
 import android.animation.ObjectAnimator;
 import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -10,51 +11,39 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 public class ChessActivity extends AppCompatActivity {
-
-
+    
+    private ImageView[][] pieceViews = new ImageView[8][8];
     private GridLayout chessBoard;
-
+    private String[] columns = {"a", "b", "c", "d", "e", "f", "g", "h"};
+    private String[] rows = {"8", "7", "6", "5", "4", "3", "2", "1"};
+    
     private ChessGame game;
-
     private TextView currentPlayerText;
-
     private TextView gameStatusText;
-
     private Button resetButton;
-
     private ImageView floatingPiece;
-
     private TextView player1NameText;
     private TextView player2NameText;
     private TextView player1ClockText;
     private TextView player2ClockText;
-
     private android.os.Handler clockHandler;
-
     private Runnable clockRunnable;
-
     private long player1Time = 60000; // 1 minute in milliseconds
     private long player2Time = 60000; // 1 minute in milliseconds
-
     private boolean isClockRunning = false;
     private Piece.Color currentPlayerInClock;
-
-
     private int[] lastMoveFrom= null;
-
     private int[] lastMoveTo = null;
-    
-    // Track previous board state for capture detection
     private Piece[][] previousBoardState = new Piece[8][8];
     private boolean isCaptureMove = false;
-    
-    // Sound player fields
     private MediaPlayer moveSound;
     private MediaPlayer captureSound;
     private MediaPlayer checkmateSound;
@@ -105,55 +94,132 @@ public class ChessActivity extends AppCompatActivity {
     }
 
     private void initializeBoard() {
-
+        createBoardSquares();
+    }
+    
+    private void createBoardSquares() {
         chessBoard.removeAllViews();
-
-        chessBoard.setColumnCount(8);
-
-        chessBoard.setRowCount(8);
-
-        int boardSize = (int) (40 * getResources().getDisplayMetrics().density);
-
+        
+        int squareSize = 300; // 500dp board width divided by 8 squares = 62.5dp per square
+        
         for (int row = 0; row < 8; row++) {
-
             for (int col = 0; col < 8; col++) {
-
-                final int finalRow = row;
-
-                final int finalCol = col;
-
-                // Use ImageView for all squares to support both images and text
-                ImageView square = new ImageView(this);
-
+                // Create a RelativeLayout for each square
+                RelativeLayout square = new RelativeLayout(this);
+                
+                // Set square size to exactly match board dimensions
                 GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-
-                params.width = boardSize;
-
-                params.height = boardSize;
-
-                params.setGravity(Gravity.CENTER);
-
-                params.columnSpec = GridLayout.spec(col);
-
-                params.rowSpec = GridLayout.spec(row);
-
+                params.width = 0;
+                params.height = 0;
+                params.rowSpec = GridLayout.spec(row,1f);
+                params.columnSpec = GridLayout.spec(col,1f);
                 square.setLayoutParams(params);
-                square.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-
-                boolean isWhiteSquare = (row + col) % 2 == 0;
-
-                int lightSquare = Color.parseColor("#F0D9B5");
-
-                int darkSquare = Color.parseColor("#858863");
-
-                square.setBackgroundColor(isWhiteSquare ? lightSquare : darkSquare);
-
+                
+                // Set background color
+                boolean isLightSquare = (row + col) % 2 == 0;
+                int bgColor = isLightSquare ? Color.parseColor("#F0D9B5") : Color.parseColor("#B58863");
+                square.setBackgroundColor(bgColor);
+                
+                // Create coordinate label (only for edge squares)
+                if (row == 7 || col == 0) { // Bottom row or left column
+                    TextView coordLabel = new TextView(this);
+                    coordLabel.setTextSize(8f); // Very small font
+                    coordLabel.setTypeface(null, Typeface.BOLD);
+                    
+                    // Set text color for better contrast
+                    int textColor = isLightSquare ? Color.parseColor("#B58863") : Color.parseColor("#F0D9B5");
+                    coordLabel.setTextColor(textColor);
+                    
+                    RelativeLayout.LayoutParams labelParams = new RelativeLayout.LayoutParams(
+                        RelativeLayout.LayoutParams.WRAP_CONTENT,
+                        RelativeLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    
+                    if (row == 7 && col == 0) {
+                        // Bottom-left corner: show "a1"
+                        coordLabel.setText("a1");
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+                        labelParams.leftMargin = 2;
+                        labelParams.bottomMargin = 2;
+                    } else if (row == 7) {
+                        // Bottom row: show column letters
+                        coordLabel.setText(columns[col]);
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+                        labelParams.leftMargin = 2;
+                        labelParams.bottomMargin = 2;
+                    } else if (col == 0) {
+                        // Left column: show row numbers
+                        coordLabel.setText(rows[row]);
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+                        labelParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT);
+                        labelParams.leftMargin = 2;
+                        labelParams.topMargin = 2;
+                    }
+                    
+                    coordLabel.setLayoutParams(labelParams);
+                    square.addView(coordLabel);
+                }
+                
+                // Create ImageView for chess piece
+                ImageView pieceView = new ImageView(this);
+                RelativeLayout.LayoutParams pieceParams = new RelativeLayout.LayoutParams(
+                    squareSize,squareSize
+                );
+                pieceParams.addRule(RelativeLayout.CENTER_IN_PARENT);
+                pieceView.setLayoutParams(pieceParams);
+                pieceView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                
+                square.addView(pieceView);
+                pieceViews[col][row] = pieceView;
+                
+                // Set click listener
+                final int finalRow = row;
+                final int finalCol = col;
                 square.setOnClickListener(v -> onSquareClick(finalRow, finalCol));
-
+                
                 chessBoard.addView(square);
-
             }
-
+        }
+    }
+    
+    private void setupInitialPieces() {
+        // White pieces
+        placePiece(0, 7, R.drawable.rook_white); // a1 rook
+        placePiece(1, 7, R.drawable.knight_white); // b1 knight
+        placePiece(2, 7, R.drawable.bishop_white); // c1 bishop
+        placePiece(3, 7, R.drawable.queen_white); // d1 queen
+        placePiece(4, 7, R.drawable.king_white); // e1 king
+        placePiece(5, 7, R.drawable.bishop_white); // f1 bishop
+        placePiece(6, 7, R.drawable.knight_white); // g1 knight
+        placePiece(7, 7, R.drawable.rook_white); // h1 rook
+        
+        // White pawns
+        for (int col = 0; col < 8; col++) {
+            placePiece(col, 6, R.drawable.pawn_white);
+        }
+        
+        // Black pieces
+        placePiece(0, 0, R.drawable.rook_black); // a8 rook
+        placePiece(1, 0, R.drawable.knight_black); // b8 knight
+        placePiece(2, 0, R.drawable.bishop_black); // c8 bishop
+        placePiece(3, 0, R.drawable.queen_black); // d8 queen
+        placePiece(4, 0, R.drawable.king_black); // e8 king
+        placePiece(5, 0, R.drawable.bishop_black); // f8 bishop
+        placePiece(6, 0, R.drawable.knight_black); // g8 knight
+        placePiece(7, 0, R.drawable.rook_black); // h8 rook
+        
+        // Black pawns
+        for (int col = 0; col < 8; col++) {
+            placePiece(col, 1, R.drawable.pawn_black);
+        }
+    }
+    
+    private void placePiece(int col, int row, int pieceResId) {
+        if (pieceViews[col][row] != null) {
+            pieceViews[col][row].setImageResource(pieceResId);
+            pieceViews[col][row].setVisibility(View.VISIBLE);
         }
     }
 
@@ -288,11 +354,9 @@ public class ChessActivity extends AppCompatActivity {
     }
 
     private void updateBoard() {
-
         java.util.List<int[]> validMoves = null;
 
         if (game.isPieceSelected()) {
-
             validMoves = game.getValidMoves(game.getSelectedRow(), game.getSelectedCol());
 
             Piece selectedPiece = game.getPiece(game.getSelectedRow(), game.getSelectedCol());
@@ -307,110 +371,140 @@ public class ChessActivity extends AppCompatActivity {
             }
         }
         
-        for (int i = 0; i < chessBoard.getChildCount(); i++) {
-
-            View child = chessBoard.getChildAt(i);
-
-            if (child instanceof ImageView) {
-                ImageView square = (ImageView) child;
-
-                int row = i / 8;
-                int col = i % 8;
-
-                boolean isWhiteSquare = (row + col) % 2 == 0;
-                int lightSquare = Color.parseColor("#F0D9B5");
-                int darkSquare = Color.parseColor("#858863");
-                int baseColor = isWhiteSquare ? lightSquare : darkSquare;
-
-                boolean isValidMove = false;
-                if (validMoves != null) {
-                    for (int[] move : validMoves) {
-                        if (move[0] == row && move[1] == col) {
-                            isValidMove = true;
-                            break;
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                ImageView pieceView = pieceViews[col][row];
+                if (pieceView != null) {
+                    // Reset background color based on square position
+                    boolean isLightSquare = (row + col) % 2 == 0;
+                    int bgColor = isLightSquare ? Color.parseColor("#F0D9B5") : Color.parseColor("#B58863");
+                    // Note: We can't easily change the background of the RelativeLayout parent here
+                    // The background is set in createBoardSquares and should remain consistent
+                    
+                    boolean isValidMove = false;
+                    if (validMoves != null) {
+                        for (int[] move : validMoves) {
+                            if (move[0] == row && move[1] == col) {
+                                isValidMove = true;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (game.isPieceSelected() &&
-                        game.getSelectedRow() == row &&
-                        game.getSelectedCol() == col) {
-                    square.setBackgroundColor(Color.parseColor("#FFD700"));
-                } else if (isValidMove) {
-                    // Create a black circle for valid move indicators
-                    square.setImageDrawable(createBlackCircleDrawable());
-                    // Keep the original board color, don't change background
-                } else {
-                    square.setBackgroundColor(baseColor);
-                }
+                    Piece piece = game.getPiece(row, col);
+                    boolean isNewPosition = lastMoveTo != null && lastMoveTo[0] == row && lastMoveTo[1] == col;
 
-                Piece piece = game.getPiece(row, col);
-                boolean isNewPosition = lastMoveTo != null && lastMoveTo[0] == row && lastMoveTo[1] == col;
+                    if (piece != null) {
+                        // Display appropriate piece image based on type and color
+                        switch (piece.getType()) {
+                            case PAWN:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.pawn_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.pawn_white);
+                                }
+                                break;
+                            case ROOK:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.rook_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.rook_white);
+                                }
+                                break;
+                            case KNIGHT:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.knight_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.knight_white);
+                                }
+                                break;
+                            case BISHOP:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.bishop_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.bishop_white);
+                                }
+                                break;
+                            case QUEEN:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.queen_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.queen_white);
+                                }
+                                break;
+                            case KING:
+                                if (piece.getColor() == Piece.Color.BLACK) {
+                                    pieceView.setImageResource(R.drawable.king_black);
+                                } else {
+                                    pieceView.setImageResource(R.drawable.king_white);
+                                }
+                                break;
+                        }
 
-                if (piece != null) {
-                    // Display appropriate piece image based on type and color
-                    switch (piece.getType()) {
-                        case PAWN:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.pawn_black);
-                            } else {
-                                square.setImageResource(R.drawable.pawn_white);
+                        // Show shadow on opponent pieces that can be captured as overlay
+                        if (isValidMove && piece.getColor() != game.getCurrentPlayer()) {
+                            // Create a combined drawable with piece image and circle overlay
+                            pieceView.setImageDrawable(createPieceWithShadowDrawable(piece));
+                        } else {
+                            // Ensure normal piece display for non-capture moves
+                            switch (piece.getType()) {
+                                case PAWN:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.pawn_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.pawn_white);
+                                    }
+                                    break;
+                                case ROOK:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.rook_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.rook_white);
+                                    }
+                                    break;
+                                case KNIGHT:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.knight_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.knight_white);
+                                    }
+                                    break;
+                                case BISHOP:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.bishop_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.bishop_white);
+                                    }
+                                    break;
+                                case QUEEN:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.queen_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.queen_white);
+                                    }
+                                    break;
+                                case KING:
+                                    if (piece.getColor() == Piece.Color.BLACK) {
+                                        pieceView.setImageResource(R.drawable.king_black);
+                                    } else {
+                                        pieceView.setImageResource(R.drawable.king_white);
+                                    }
+                                    break;
                             }
-                            break;
-                        case ROOK:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.rook_black);
-                            } else {
-                                square.setImageResource(R.drawable.rook_white);
-                            }
-                            break;
-                        case KNIGHT:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.knight_black);
-                            } else {
-                                square.setImageResource(R.drawable.knight_white);
-                            }
-                            break;
-                        case BISHOP:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.bishop_black);
-                            } else {
-                                square.setImageResource(R.drawable.bishop_white);
-                            }
-                            break;
-                        case QUEEN:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.queen_black);
-                            } else {
-                                square.setImageResource(R.drawable.queen_white);
-                            }
-                            break;
-                        case KING:
-                            if (piece.getColor() == Piece.Color.BLACK) {
-                                square.setImageResource(R.drawable.king_black);
-                            } else {
-                                square.setImageResource(R.drawable.king_white);
-                            }
-                            break;
+                        }
+
+                        if (isNewPosition) {
+                            pieceView.setAlpha(0f);
+                            ObjectAnimator fadeIn = ObjectAnimator.ofFloat(pieceView, "alpha", 0f, 1f);
+                            fadeIn.setDuration(200);
+                            fadeIn.start();
+                        }
+                    } else if (isValidMove) {
+                        // Show black circle for valid moves on empty squares
+                        pieceView.setImageDrawable(createBlackCircleDrawable());
+                    } else {
+                        pieceView.setImageResource(0);
                     }
-
-                    // Show shadow on opponent pieces that can be captured as overlay
-                    if (isValidMove && piece.getColor() != game.getCurrentPlayer()) {
-                        // Create a combined drawable with piece image and circle overlay
-                        square.setImageDrawable(createPieceWithShadowDrawable(piece));
-                    }
-
-                    if (isNewPosition) {
-                        square.setAlpha(0f);
-                        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(square, "alpha", 0f, 1f);
-                        fadeIn.setDuration(200);
-                        fadeIn.start();
-                    }
-                } else if (isValidMove) {
-                    // Show black circle for valid moves on empty squares
-                    square.setImageDrawable(createBlackCircleDrawable());
-                } else {
-                    square.setImageResource(0);
                 }
             }
         }

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/squareContainer"
+    android:layout_width="0dp"
+    android:layout_height="0dp"
+    android:padding="0dp">
+    
+    <!-- Background view -->
+    <View
+        android:id="@+id/squareBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+    
+    <!-- Coordinate labels -->
+    <TextView
+        android:id="@+id/columnLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:padding="2dp"
+        android:layout_gravity="bottom|end"
+        android:visibility="gone" />
+    
+    <TextView
+        android:id="@+id/rowLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="10sp"
+        android:textStyle="bold"
+        android:padding="2dp"
+        android:layout_gravity="top|start"
+        android:visibility="gone" />
+    
+    <!-- Chess piece -->
+    <ImageView
+        android:id="@+id/pieceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:padding="0dp" />
+        
+</FrameLayout>
