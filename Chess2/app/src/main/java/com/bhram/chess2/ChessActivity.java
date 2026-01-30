@@ -50,6 +50,10 @@ public class ChessActivity extends AppCompatActivity {
 
     private int[] lastMoveTo = null;
     
+    // Track previous board state for capture detection
+    private Piece[][] previousBoardState = new Piece[8][8];
+    private boolean isCaptureMove = false;
+    
     // Sound player fields
     private MediaPlayer moveSound;
     private MediaPlayer captureSound;
@@ -164,6 +168,50 @@ public class ChessActivity extends AppCompatActivity {
         startPlayerClock(Piece.Color.WHITE);
         Toast.makeText(this, "New game", Toast.LENGTH_SHORT).show();
     }
+    
+    // Save current board state for capture detection
+    private void saveBoardState() {
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                previousBoardState[row][col] = game.getPiece(row, col);
+            }
+        }
+    }
+    
+    // Detect if a move was a capture by comparing board states
+    private boolean detectCaptureMove(int fromRow, int fromCol, int toRow, int toCol) {
+        // Check for en passant capture first
+        if (game.isEnPassantCapture(fromRow, fromCol, toRow, toCol)) {
+            android.util.Log.d("ChessSound", "Detected en passant capture");
+            return true;
+        }
+        
+        // Check if the destination square had an opponent's piece before the move
+        Piece previousPieceAtDestination = previousBoardState[toRow][toCol];
+        Piece movingPiece = game.getPiece(toRow, toCol);
+        
+        if (movingPiece != null && previousPieceAtDestination != null) {
+            // If there was a piece at destination and it's different from what's there now,
+            // or if the moving piece is different color from the previous piece
+            if (previousPieceAtDestination.getColor() != movingPiece.getColor()) {
+                android.util.Log.d("ChessSound", "Detected capture: opponent piece was at destination");
+                return true;
+            }
+        }
+        
+        // For pawn captures (diagonal moves), check if it's a capture pattern
+        if (movingPiece != null && movingPiece.getType() == Piece.Type.PAWN) {
+            if (Math.abs(fromCol - toCol) == 1 && fromRow != toRow) {
+                // Pawn moved diagonally - this is a capture move
+                android.util.Log.d("ChessSound", "Detected pawn capture (diagonal move)");
+                return true;
+            }
+        }
+        
+        // If no capture detected, it's a normal move
+        android.util.Log.d("ChessSound", "No capture detected - normal move");
+        return false;
+    }
 
     private void onSquareClick(int row, int col) {
 
@@ -179,64 +227,23 @@ public class ChessActivity extends AppCompatActivity {
             lastMoveFrom = new int[]{game.getSelectedRow(), game.getSelectedCol()};
 
             lastMoveTo = new int[]{row, col};
+            
+            // Save current board state before making the move
+            saveBoardState();
+            
             boolean moveSuccessful = game.movePiece(row, col);
 
             if (moveSuccessful) {
+                // Determine if this was a capture move by comparing board states
+                isCaptureMove = detectCaptureMove(game.getSelectedRow(), game.getSelectedCol(), row, col);
+                
                 // Play appropriate sound based on move type
-                // Check if a piece was captured by looking at the previous state
-                Piece capturedPiece = null;
-                if (row >= 0 && row < 8 && col >= 0 && col < 8) {
-                    // Check if there was a piece at the destination before the move
-                    // We need to check the board state before the move was made
-                    // Since the move is already executed, we'll use a different approach
-                    
-                    // For normal captures: if the destination square had an opponent's piece
-                    // For en passant: special detection needed
-                    
-                    // Let's implement a simpler approach - check if the move was a capture
-                    // by examining the move history or by checking the game state
-                    
-                    // For now, let's use a simpler detection method
-                    boolean isCapture = false;
-                    
-                    // Check if this was an en passant capture
-                    if (game.isEnPassantCapture(game.getSelectedRow(), game.getSelectedCol(), row, col)) {
-                        isCapture = true;
-                        android.util.Log.d("ChessSound", "Detected en passant capture");
-                    } else {
-                        // For regular captures, we need to check if a piece was removed from the board
-                        // Since the move is already executed, we'll use a different approach
-                        // Let's check if the move was diagonal for pawns (potential capture)
-                        // or if it's a normal capture pattern
-                        
-                        int fromRow = game.getSelectedRow();
-                        int fromCol = game.getSelectedCol();
-                        Piece movingPiece = game.getPiece(row, col); // This is now the moved piece
-                        
-                        if (movingPiece != null) {
-                            // Check if this looks like a capture move
-                            if (movingPiece.getType() == Piece.Type.PAWN) {
-                                // Pawn captures are diagonal
-                                if (Math.abs(fromCol - col) == 1 && row != fromRow) {
-                                    isCapture = true;
-                                    android.util.Log.d("ChessSound", "Detected pawn capture");
-                                }
-                            } else {
-                                // For other pieces, check if they moved to a square that could contain an opponent
-                                // This is a simplified check - in a real implementation, we'd track the previous board state
-                                isCapture = true; // Assume it's a capture for testing
-                                android.util.Log.d("ChessSound", "Assuming capture for non-pawn piece");
-                            }
-                        }
-                    }
-                    
-                    if (isCapture) {
-                        android.util.Log.d("ChessSound", "Playing capture sound");
-                        playCaptureSound();
-                    } else {
-                        android.util.Log.d("ChessSound", "Playing move sound");
-                        playMoveSound();
-                    }
+                if (isCaptureMove) {
+                    android.util.Log.d("ChessSound", "Playing capture sound");
+                    playCaptureSound();
+                } else {
+                    android.util.Log.d("ChessSound", "Playing move sound");
+                    playMoveSound();
                 }
 
                 updateBoard();
