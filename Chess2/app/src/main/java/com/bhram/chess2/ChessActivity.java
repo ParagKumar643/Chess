@@ -38,7 +38,7 @@ public class ChessActivity extends AppCompatActivity {
     private ImageView floatingPiece;
 
 
-    private int[] lastMoveFrom = null;
+    private int[] lastMoveFrom= null;
 
     private int[] lastMoveTo = null;
 
@@ -198,8 +198,12 @@ public class ChessActivity extends AppCompatActivity {
             Piece selectedPiece = game.getPiece(game.getSelectedRow(), game.getSelectedCol());
             if (selectedPiece != null && selectedPiece.getType() == Piece.Type.KING) {
                 java.util.List<int[]> castlingMoves = game.getCastlingMoves(game.getSelectedRow(), game.getSelectedCol());
-                validMoves.addAll(castlingMoves);
-
+                if (castlingMoves != null && !castlingMoves.isEmpty()) {
+                    if (validMoves == null) {
+                        validMoves = new java.util.ArrayList<>();
+                    }
+                    validMoves.addAll(castlingMoves);
+                }
             }
         }
         

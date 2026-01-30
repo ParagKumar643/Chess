@@ -11,6 +11,11 @@ public class ChessGame {
     private int selectedCol;
     private boolean gameOver;
     private String winner;
+    private List<String> moveHistory;
+    private int halfMoveClock;
+    private int fullMoveNumber;
+    private int lastDoublePawnMoveRow;
+    private int lastDoublePawnMoveCol;
 
     public ChessGame() {
         board = new Piece[8][8];
@@ -18,6 +23,11 @@ public class ChessGame {
         pieceSelected = false;
         gameOver = false;
         winner = null;
+        moveHistory = new ArrayList<>();
+        halfMoveClock = 0;
+        fullMoveNumber = 1;
+        lastDoublePawnMoveRow = -1;
+        lastDoublePawnMoveCol = -1;
         initializeBoard();
     }
 
@@ -106,30 +116,91 @@ public class ChessGame {
         // Check for castling
         boolean isCastling = false;
         if (piece.getType() == Piece.Type.KING && Math.abs(toCol - selectedCol) == 2) {
-            isCastling = true;
             boolean kingside = toCol > selectedCol;
-            int row = selectedRow;
-            int rookCol = kingside ? 7 : 0;
-            int newRookCol = kingside ? 5 : 3;
-
-            // Move rook
-            Piece rook = board[row][rookCol];
-            board[row][newRookCol] = rook;
-            board[row][rookCol] = null;
-            rook.setHasMoved(true);
+            isCastling = canCastle(piece.getColor(), kingside);
         }
 
-        if (isValidMove(selectedRow, selectedCol, toRow, toCol)) {
+        // Check for en passant
+        boolean isEnPassant = false;
+        if (piece.getType() == Piece.Type.PAWN && Math.abs(selectedCol - toCol) == 1 && board[toRow][toCol] == null) {
+            isEnPassant = canEnPassant(selectedRow, selectedCol, toRow, toCol);
+        }
+
+        // Get valid moves for this piece (this includes check validation)
+        List<int[]> validMoves = getValidMoves(selectedRow, selectedCol);
+        
+        // Check if the requested move is in the list of valid moves
+        boolean isValidMove = false;
+        for (int[] move : validMoves) {
+            if (move[0] == toRow && move[1] == toCol) {
+                isValidMove = true;
+                break;
+            }
+        }
+
+        if (isValidMove) {
+            // Execute castling if valid
+            if (isCastling) {
+                boolean kingside = toCol > selectedCol;
+                int row = selectedRow;
+                int rookCol = kingside ? 7 : 0;
+                int newRookCol = kingside ? 5 : 3;
+
+                // Move rook
+                Piece rook = board[row][rookCol];
+                board[row][newRookCol] = rook;
+                board[row][rookCol] = null;
+                rook.setHasMoved(true);
+            }
             Piece capturedPiece = board[toRow][toCol];
-            if (capturedPiece != null && capturedPiece.getType() == Piece.Type.KING) {
-                gameOver = true;
-                winner = currentPlayer == Piece.Color.WHITE ? "White" : "Black";
+            
+            // Handle en passant capture
+            if (isEnPassant) {
+                executeEnPassant(selectedRow, selectedCol, toRow, toCol);
+                // The captured piece is the pawn that was captured en passant
+                capturedPiece = new Piece(currentPlayer == Piece.Color.WHITE ? Piece.Color.BLACK : Piece.Color.WHITE, Piece.Type.PAWN);
             }
 
-            // Move the piece
-            board[toRow][toCol] = piece;
-            board[selectedRow][selectedCol] = null;
-            piece.setHasMoved(true);
+            // Handle castling - move the king to the correct position
+            if (isCastling) {
+                boolean kingside = toCol > selectedCol;
+                int kingToCol = kingside ? 6 : 2;
+                board[selectedRow][kingToCol] = piece;
+                board[selectedRow][selectedCol] = null;
+                piece.setHasMoved(true);
+            } else {
+                // Normal move
+                if (capturedPiece != null && capturedPiece.getType() == Piece.Type.KING) {
+                    gameOver = true;
+                    winner = currentPlayer == Piece.Color.WHITE ? "White" : "Black";
+                }
+
+                // Move the piece
+                board[toRow][toCol] = piece;
+                board[selectedRow][selectedCol] = null;
+                piece.setHasMoved(true);
+            }
+
+            // Track double pawn moves for en passant
+            if (piece.getType() == Piece.Type.PAWN && Math.abs(toRow - selectedRow) == 2) {
+                // Track the position of the pawn that moved 2 squares (the starting position)
+                lastDoublePawnMoveRow = selectedRow;
+                lastDoublePawnMoveCol = selectedCol;
+            } else {
+                lastDoublePawnMoveRow = -1;
+                lastDoublePawnMoveCol = -1;
+            }
+
+            // Update half-move clock
+            if (piece.getType() == Piece.Type.PAWN || capturedPiece != null) {
+                halfMoveClock = 0;
+            } else {
+                halfMoveClock++;
+            }
+
+            // Update move history
+            String move = getMoveNotation(selectedRow, selectedCol, toRow, toCol, piece, capturedPiece);
+            moveHistory.add(move);
 
             // Pawn promotion
             if (piece.getType() == Piece.Type.PAWN) {
@@ -143,13 +214,18 @@ public class ChessGame {
             currentPlayer = currentPlayer == Piece.Color.WHITE ? Piece.Color.BLACK : Piece.Color.WHITE;
             pieceSelected = false;
 
-            // Check for checkmate or stalemate
+            // Increment full move number after black's move
+            if (currentPlayer == Piece.Color.WHITE) {
+                fullMoveNumber++;
+            }
+
+            // Check for game end conditions
             if (isInCheckmate()) {
                 gameOver = true;
                 winner = currentPlayer == Piece.Color.WHITE ? "Black" : "White";
-            } else if (isInStalemate()) {
+            } else if (isDraw()) {
                 gameOver = true;
-                winner = "Draw (Stalemate)";
+                winner = "Draw";
             }
 
             return true;
@@ -221,6 +297,15 @@ public class ChessGame {
             }
         }
 
+        // En passant capture
+        if (Math.abs(fromCol - toCol) == 1 && toRow == fromRow + direction) {
+            Piece target = board[toRow][toCol];
+            if (target == null) {
+                // Check if en passant is possible
+                return canEnPassant(fromRow, fromCol, toRow, toCol);
+            }
+        }
+
         return false;
     }
 
@@ -280,20 +365,127 @@ public class ChessGame {
             return validMoves;
         }
 
+        // If king is in check, only allow moves that get out of check
+        boolean inCheck = isInCheck();
+        
         for (int toRow = 0; toRow < 8; toRow++) {
             for (int toCol = 0; toCol < 8; toCol++) {
                 if (isValidMove(row, col, toRow, toCol)) {
                     // Check if move would leave king in check
-                    // Temporarily disable check validation for pawn captures to debug
-                    if (piece.getType() == Piece.Type.PAWN && Math.abs(col - toCol) == 1 && toRow == row + (piece.getColor() == Piece.Color.WHITE ? -1 : 1)) {
-                        // This is a pawn capture - allow it for now to test
-                        validMoves.add(new int[]{toRow, toCol});
-                    } else if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
-                        validMoves.add(new int[]{toRow, toCol});
+                    if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
+                        // If king is in check, only allow moves that actually get out of check
+                        if (inCheck) {
+                            // Make the temporary move to test if it gets out of check
+                            Piece movingPiece = board[row][col];
+                            Piece capturedPiece = board[toRow][toCol];
+                            board[toRow][toCol] = movingPiece;
+                            board[row][col] = null;
+                            
+                            // Check if king is still in check after the move
+                            boolean stillInCheck = isInCheck();
+                            
+                            // Undo the temporary move
+                            board[row][col] = movingPiece;
+                            board[toRow][toCol] = capturedPiece;
+                            
+                            // Only add the move if it gets the king out of check
+                            if (!stillInCheck) {
+                                validMoves.add(new int[]{toRow, toCol});
+                            }
+                        } else {
+                            // If not in check, normal validation applies
+                            validMoves.add(new int[]{toRow, toCol});
+                        }
                     }
                 }
             }
         }
+        
+        // Add en passant moves for pawns
+        if (piece.getType() == Piece.Type.PAWN) {
+            int direction = piece.getColor() == Piece.Color.WHITE ? -1 : 1;
+            
+            // Check left en passant
+            if (col > 0) {
+                int toRow = row + direction;
+                int toCol = col - 1;
+                if (canEnPassant(row, col, toRow, toCol)) {
+                    // Check if en passant move would leave king in check
+                    if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
+                        // If king is in check, only allow moves that actually get out of check
+                        if (inCheck) {
+                            // Make the temporary move to test if it gets out of check
+                            Piece movingPiece = board[row][col];
+                            Piece capturedPiece = board[toRow][toCol];
+                            board[toRow][toCol] = movingPiece;
+                            board[row][col] = null;
+                            
+                            // For en passant, we need to temporarily remove the captured pawn
+                            int capturedRow = row + direction;
+                            Piece enPassantCaptured = board[capturedRow][toCol];
+                            board[capturedRow][toCol] = null;
+                            
+                            // Check if king is still in check after the move
+                            boolean stillInCheck = isInCheck();
+                            
+                            // Undo the temporary move
+                            board[row][col] = movingPiece;
+                            board[toRow][toCol] = capturedPiece;
+                            board[capturedRow][toCol] = enPassantCaptured;
+                            
+                            // Only add the move if it gets the king out of check
+                            if (!stillInCheck) {
+                                validMoves.add(new int[]{toRow, toCol});
+                            }
+                        } else {
+                            // If not in check, normal validation applies
+                            validMoves.add(new int[]{toRow, toCol});
+                        }
+                    }
+                }
+            }
+            
+            // Check right en passant
+            if (col < 7) {
+                int toRow = row + direction;
+                int toCol = col + 1;
+                if (canEnPassant(row, col, toRow, toCol)) {
+                    // Check if en passant move would leave king in check
+                    if (!wouldBeInCheck(row, col, toRow, toCol, piece.getColor())) {
+                        // If king is in check, only allow moves that actually get out of check
+                        if (inCheck) {
+                            // Make the temporary move to test if it gets out of check
+                            Piece movingPiece = board[row][col];
+                            Piece capturedPiece = board[toRow][toCol];
+                            board[toRow][toCol] = movingPiece;
+                            board[row][col] = null;
+                            
+                            // For en passant, we need to temporarily remove the captured pawn
+                            int capturedRow = row + direction;
+                            Piece enPassantCaptured = board[capturedRow][toCol];
+                            board[capturedRow][toCol] = null;
+                            
+                            // Check if king is still in check after the move
+                            boolean stillInCheck = isInCheck();
+                            
+                            // Undo the temporary move
+                            board[row][col] = movingPiece;
+                            board[toRow][toCol] = capturedPiece;
+                            board[capturedRow][toCol] = enPassantCaptured;
+                            
+                            // Only add the move if it gets the king out of check
+                            if (!stillInCheck) {
+                                validMoves.add(new int[]{toRow, toCol});
+                            }
+                        } else {
+                            // If not in check, normal validation applies
+                            validMoves.add(new int[]{toRow, toCol});
+                        }
+                    }
+                }
+            }
+        }
+        
         return validMoves;
     }
 
@@ -494,5 +686,258 @@ public class ChessGame {
         }
 
         return castlingMoves;
+    }
+
+    // Check if en passant is possible
+    private boolean canEnPassant(int fromRow, int fromCol, int toRow, int toCol) {
+        // Check if this is a pawn capture move
+        if (Math.abs(fromCol - toCol) != 1 || Math.abs(fromRow - toRow) != 1) {
+            return false;
+        }
+
+        // Check if there's a pawn that just moved two squares
+        int direction = (toRow - fromRow) > 0 ? 1 : -1;
+        int adjacentRow = fromRow + direction;
+        int adjacentCol = toCol;
+        
+        if (adjacentRow < 0 || adjacentRow >= 8 || adjacentCol < 0 || adjacentCol >= 8) {
+            return false;
+        }
+
+        Piece adjacentPiece = board[adjacentRow][adjacentCol];
+        if (adjacentPiece == null || adjacentPiece.getType() != Piece.Type.PAWN) {
+            return false;
+        }
+
+        // Check if this pawn just moved two squares in the last move
+        // The lastDoublePawnMoveRow/Col tracks the starting position of the double move
+        // We need to check if the adjacent pawn is the one that moved 2 squares
+        // The adjacent pawn should be at the destination of the double move
+        int expectedStartRow = adjacentRow - (2 * direction);
+        if (expectedStartRow >= 0 && expectedStartRow < 8) {
+            if (lastDoublePawnMoveRow == expectedStartRow && lastDoublePawnMoveCol == adjacentCol) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Execute en passant capture
+    private void executeEnPassant(int fromRow, int fromCol, int toRow, int toCol) {
+        int direction = (toRow - fromRow) > 0 ? 1 : -1;
+        int capturedRow = fromRow + direction;
+        int capturedCol = toCol;
+
+        // Remove the captured pawn
+        board[capturedRow][capturedCol] = null;
+    }
+
+    // Check for threefold repetition
+    public boolean isThreefoldRepetition() {
+        if (moveHistory.size() < 8) {
+            return false;
+        }
+
+        // Count occurrences of current board position
+        String currentPosition = getBoardPosition();
+        int count = 0;
+        
+        for (String position : moveHistory) {
+            if (position.equals(currentPosition)) {
+                count++;
+            }
+        }
+
+        return count >= 3;
+    }
+
+    // Check for fifty-move rule
+    public boolean isFiftyMoveRule() {
+        return halfMoveClock >= 100; // 50 moves by each player = 100 half-moves
+    }
+
+    // Check for insufficient material
+    public boolean isInsufficientMaterial() {
+        int whitePieces = 0;
+        int blackPieces = 0;
+        boolean whiteHasBishop = false;
+        boolean blackHasBishop = false;
+        boolean whiteHasKnight = false;
+        boolean blackHasKnight = false;
+
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = board[row][col];
+                if (piece != null) {
+                    switch (piece.getType()) {
+                        case PAWN:
+                        case ROOK:
+                        case QUEEN:
+                            return false; // Game not drawn
+                        case BISHOP:
+                            if (piece.getColor() == Piece.Color.WHITE) {
+                                whiteHasBishop = true;
+                            } else {
+                                blackHasBishop = true;
+                            }
+                            break;
+                        case KNIGHT:
+                            if (piece.getColor() == Piece.Color.WHITE) {
+                                whiteHasKnight = true;
+                            } else {
+                                blackHasKnight = true;
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+
+        // Check for insufficient material combinations
+        // King vs King
+        if (!whiteHasBishop && !whiteHasKnight && !blackHasBishop && !blackHasKnight) {
+            return true;
+        }
+        
+        // King + Bishop vs King
+        if ((whiteHasBishop && !whiteHasKnight && !blackHasBishop && !blackHasKnight) ||
+            (!whiteHasBishop && !whiteHasKnight && blackHasBishop && !blackHasKnight)) {
+            return true;
+        }
+        
+        // King + Knight vs King
+        if ((whiteHasKnight && !whiteHasBishop && !blackHasBishop && !blackHasKnight) ||
+            (!whiteHasBishop && !whiteHasKnight && blackHasKnight && !blackHasBishop)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Get board position for repetition checking
+    private String getBoardPosition() {
+        StringBuilder sb = new StringBuilder();
+        for (int row = 0; row < 8; row++) {
+            for (int col = 0; col < 8; col++) {
+                Piece piece = board[row][col];
+                if (piece == null) {
+                    sb.append("-");
+                } else {
+                    sb.append(piece.getColor() == Piece.Color.WHITE ? "W" : "B");
+                    switch (piece.getType()) {
+                        case PAWN: sb.append("P"); break;
+                        case ROOK: sb.append("R"); break;
+                        case KNIGHT: sb.append("N"); break;
+                        case BISHOP: sb.append("B"); break;
+                        case QUEEN: sb.append("Q"); break;
+                        case KING: sb.append("K"); break;
+                    }
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    // Check if game is drawn
+    public boolean isDraw() {
+        return isThreefoldRepetition() || isFiftyMoveRule() || isInsufficientMaterial() || isInStalemate();
+    }
+
+    // Get move notation for move history
+    private String getMoveNotation(int fromRow, int fromCol, int toRow, int toCol, Piece piece, Piece capturedPiece) {
+        StringBuilder notation = new StringBuilder();
+        
+        // Add piece type (except for pawns)
+        if (piece.getType() != Piece.Type.PAWN) {
+            switch (piece.getType()) {
+                case ROOK: notation.append("R"); break;
+                case KNIGHT: notation.append("N"); break;
+                case BISHOP: notation.append("B"); break;
+                case QUEEN: notation.append("Q"); break;
+                case KING: notation.append("K"); break;
+            }
+        }
+        
+        // Add source column (for disambiguation if needed)
+        char fromFile = (char) ('a' + fromCol);
+        notation.append(fromFile);
+        
+        // Add capture marker if capturing
+        if (capturedPiece != null) {
+            notation.append("x");
+        }
+        
+        // Add destination square
+        char toFile = (char) ('a' + toCol);
+        int toRank = 8 - toRow;
+        notation.append(toFile).append(toRank);
+        
+        return notation.toString();
+    }
+
+    // Get game status
+    public String getGameStatus() {
+        if (gameOver) {
+            if (winner.equals("Draw")) {
+                return "Game ended in a draw";
+            } else {
+                return "Game over - " + winner + " wins";
+            }
+        } else if (isInCheck()) {
+            return currentPlayer + " is in check";
+        } else {
+            return currentPlayer + "'s turn";
+        }
+    }
+
+    // Reset game
+    public void resetGame() {
+        board = new Piece[8][8];
+        currentPlayer = Piece.Color.WHITE;
+        pieceSelected = false;
+        gameOver = false;
+        winner = null;
+        moveHistory.clear();
+        halfMoveClock = 0;
+        fullMoveNumber = 1;
+        lastDoublePawnMoveRow = -1;
+        lastDoublePawnMoveCol = -1;
+        initializeBoard();
+    }
+
+    // Get move history
+    public List<String> getMoveHistory() {
+        return new ArrayList<>(moveHistory);
+    }
+
+    // Get current move number
+    public int getCurrentMoveNumber() {
+        return fullMoveNumber;
+    }
+
+    // Check if a square is under attack
+    public boolean isSquareUnderAttack(int row, int col, Piece.Color attackerColor) {
+        return isSquareAttacked(row, col, attackerColor);
+    }
+
+    // Get number of half-moves since last capture or pawn move
+    public int getHalfMoveClock() {
+        return halfMoveClock;
+    }
+
+    // Check if a piece can move to a specific square (considering check)
+    public boolean canPieceMoveTo(int fromRow, int fromCol, int toRow, int toCol) {
+        Piece piece = board[fromRow][fromCol];
+        if (piece == null) {
+            return false;
+        }
+
+        if (!isValidMove(fromRow, fromCol, toRow, toCol)) {
+            return false;
+        }
+
+        // Check if move would leave king in check
+        return !wouldBeInCheck(fromRow, fromCol, toRow, toCol, piece.getColor());
     }
 }
