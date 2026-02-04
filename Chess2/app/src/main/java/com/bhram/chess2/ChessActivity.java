@@ -36,8 +36,8 @@ public class ChessActivity extends AppCompatActivity {
     private TextView player2ClockText;
     private android.os.Handler clockHandler;
     private Runnable clockRunnable;
-    private long player1Time = 60000; // 1 minute in milliseconds
-    private long player2Time = 60000; // 1 minute in milliseconds
+    private long player1Time = 600000; // 10 minutes in milliseconds
+    private long player2Time = 600000; // 10 minutes in milliseconds
     private boolean isClockRunning = false;
     private Piece.Color currentPlayerInClock;
     private int[] lastMoveFrom= null;
@@ -114,9 +114,9 @@ public class ChessActivity extends AppCompatActivity {
                 params.columnSpec = GridLayout.spec(col,1f);
                 square.setLayoutParams(params);
                 
-                // Set background color
+                // Set background color using blue theme
                 boolean isLightSquare = (row + col) % 2 == 0;
-                int bgColor = isLightSquare ? Color.parseColor("#F0D9B5") : Color.parseColor("#B58863");
+                int bgColor = isLightSquare ? Color.parseColor("#64B5F6") : Color.parseColor("#1976D2"); // Blue light and dark
                 square.setBackgroundColor(bgColor);
                 
                 // Create coordinate label (only for edge squares)
@@ -411,9 +411,9 @@ public class ChessActivity extends AppCompatActivity {
             for (int col = 0; col < 8; col++) {
                 ImageView pieceView = pieceViews[col][row];
                 if (pieceView != null) {
-                    // Reset background color based on square position
+                    // Reset background color based on square position (using blue theme)
                     boolean isLightSquare = (row + col) % 2 == 0;
-                    int bgColor = isLightSquare ? Color.parseColor("#F0D9B5") : Color.parseColor("#B58863");
+                    int bgColor = isLightSquare ? Color.parseColor("#64B5F6") : Color.parseColor("#1976D2");
                     // Note: We can't easily change the background of the RelativeLayout parent here
                     // The background is set in createBoardSquares and should remain consistent
                     
@@ -547,15 +547,17 @@ public class ChessActivity extends AppCompatActivity {
     }
 
     private void showGameOverMessage() {
-
         String winner = game.getWinner();
-
+        String gameResult = "";
+        
         if (winner.contains("Draw")) {
-
+            gameResult = "Draw";
             Toast.makeText(this, "Game Over! " + winner, Toast.LENGTH_LONG).show();
-
+        } else if (winner.contains("time")) {
+            gameResult = "Time Up";
+            Toast.makeText(this, "Game Over! " + winner, Toast.LENGTH_LONG).show();
         } else {
-
+            gameResult = "Checkmate";
             Toast.makeText(this, "Game Over! " + winner + " wins!", Toast.LENGTH_LONG).show();
         }
         
@@ -565,6 +567,9 @@ public class ChessActivity extends AppCompatActivity {
         }
         
         stopClock();
+        
+        // Show Game Over Fragment
+        showGameOverFragment(winner, gameResult);
     }
     
     private void switchPlayer() {
@@ -625,8 +630,8 @@ public class ChessActivity extends AppCompatActivity {
                     notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♘" : "♞");
                     break;
                 case BISHOP:
-                    // Use Unicode bishop symbol (♗ for white, ♝ for black)
-                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "♗" : "♝");
+                    // Use text representation for bishop
+                    notation.append(movingPiece.getColor() == Piece.Color.WHITE ? "B" : "b");
                     break;
                 case ROOK:
                     // Use Unicode rook symbol (♖ for white, ♜ for black)
@@ -706,8 +711,8 @@ public class ChessActivity extends AppCompatActivity {
     
     private void resetPlayerClocks() {
         stopClock();
-        player1Time = 60000; // 1 minute
-        player2Time = 60000; // 1 minute
+        player1Time = 600000; // 10 minutes
+        player2Time = 600000; // 10 minutes
         updatePlayerClocks();
     }
     
@@ -928,5 +933,51 @@ public class ChessActivity extends AppCompatActivity {
         canvas.drawCircle(centerX, centerY, radius, paint);
         
         return new android.graphics.drawable.BitmapDrawable(getResources(), bitmap);
+    }
+    
+    private void showGameOverFragment(String winner, String gameResult) {
+        // Make the fragment container visible
+        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+        
+        // Show Game Over Fragment
+        GameOverFragment gameOverFragment = GameOverFragment.newInstance(winner, gameResult, moveCounter - 1, formatTime(player1Time + player2Time));
+        gameOverFragment.setOnGameOverActionListener(new GameOverFragment.OnGameOverActionListener() {
+            @Override
+            public void onNewGame() {
+                // Hide the fragment
+                androidx.fragment.app.Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (fragment != null) {
+                    getSupportFragmentManager().beginTransaction()
+                        .remove(fragment)
+                        .commit();
+                }
+                // Reset the game
+                resetGame();
+            }
+
+            @Override
+            public void onBackToHome() {
+                // Hide the fragment
+                androidx.fragment.app.Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                if (fragment != null) {
+                    getSupportFragmentManager().beginTransaction()
+                        .remove(fragment)
+                        .commit();
+                }
+                // Navigate back to home
+                finish();
+            }
+        });
+
+        getSupportFragmentManager().beginTransaction()
+            .add(R.id.fragment_container, gameOverFragment)
+            .commit();
+    }
+    
+    private String formatTime(long timeInMillis) {
+        int totalSeconds = (int) (timeInMillis / 1000);
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        return String.format("%02d:%02d", minutes, seconds);
     }
 }
