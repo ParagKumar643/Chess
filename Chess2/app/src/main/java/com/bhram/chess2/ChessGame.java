@@ -114,6 +114,11 @@ public class ChessGame {
             return false;
         }
 
+        // Add bounds checking
+        if (row < 0 || row >= 8 || col < 0 || col >= 8) {
+            return false;
+        }
+
         Piece piece = board[row][col];
         if (piece != null && piece.getColor() == currentPlayer) {
             selectedRow = row;
@@ -130,6 +135,12 @@ public class ChessGame {
         }
 
         Piece piece = board[selectedRow][selectedCol];
+        
+        // Safety check: ensure the selected piece still exists
+        if (piece == null) {
+            pieceSelected = false;
+            return false;
+        }
 
         // Check for castling
         boolean isCastling = false;
@@ -222,11 +233,21 @@ public class ChessGame {
                                                  false, currentPlayer);
             moveHistory.add(moveRecord);
 
-            // Pawn promotion
+    // Pawn promotion - check if pawn reached the end
             if (piece.getType() == Piece.Type.PAWN) {
-                if ((piece.getColor() == Piece.Color.WHITE && toRow == 0) || 
-                    (piece.getColor() == Piece.Color.BLACK && toRow == 7)) {
-                    board[toRow][toCol] = new Piece(piece.getColor(), Piece.Type.QUEEN);
+                boolean isPromotion = (piece.getColor() == Piece.Color.WHITE && toRow == 0) || 
+                                     (piece.getColor() == Piece.Color.BLACK && toRow == 7);
+                
+                if (isPromotion) {
+                    // Set promotion state
+                    isPromoting = true;
+                    promotionRow = toRow;
+                    promotionCol = toCol;
+                    promotingPlayer = piece.getColor();
+                    
+                    // Don't switch player yet - wait for promotion to be completed
+                    // The activity will handle the promotion and then call setPromotionComplete
+                    return true;
                 }
             }
 
@@ -340,27 +361,28 @@ public class ChessGame {
 
     // Check for threefold repetition
     public boolean isThreefoldRepetition() {
+        // Need at least 8 moves (4 full moves) to have a chance of repetition
         if (moveHistory.size() < 8) {
             return false;
         }
 
         // Count occurrences of current board position
         String currentPosition = getBoardPosition();
-        int count = 0;
+        int count = 1; // Count current position as 1
         
         // Count how many times the current position appears in the move history
         // We need to reconstruct the board state for each move to check for repetition
-        for (int i = 0; i < moveHistory.size(); i++) {
+        for (int i = 0; i < moveHistory.size() - 1; i++) { // Exclude current move
             // Create a temporary board to check the position at move i
             Piece[][] tempBoard = new Piece[8][8];
-            // Copy current board state
+            // Start with initial board state
             for (int row = 0; row < 8; row++) {
                 for (int col = 0; col < 8; col++) {
-                    tempBoard[row][col] = board[row][col];
+                    tempBoard[row][col] = null;
                 }
             }
             
-            // Reconstruct board state at move i
+            // Reconstruct board state at move i by replaying moves from the beginning
             for (int j = 0; j <= i; j++) {
                 MoveRecord record = moveHistory.get(j);
                 executeMoveFromRecordForRepetitionCheck(tempBoard, record);
@@ -373,6 +395,9 @@ public class ChessGame {
             }
         }
 
+        // Debug: Print repetition count
+        System.out.println("DEBUG: Threefold repetition check - count: " + count + ", threshold: 3");
+        
         return count >= 3;
     }
     
@@ -528,9 +553,81 @@ public class ChessGame {
 
     // Check if game is drawn
     public boolean isDraw() {
+        // Debug: Print current game state
+        System.out.println("DEBUG: isDraw() called - currentPlayer: " + currentPlayer + ", moveHistory.size(): " + moveHistory.size());
+        
+        // Check for threefold repetition
+        boolean isThreefold = isThreefoldRepetition();
+        if (isThreefold) {
+            System.out.println("DEBUG: Threefold repetition detected");
+        }
+        
+        // Check for fifty-move rule
+        boolean isFiftyMove = isFiftyMoveRule();
+        if (isFiftyMove) {
+            System.out.println("DEBUG: Fifty-move rule detected - halfMoveClock: " + halfMoveClock);
+        }
+        
+        // Check for insufficient material
+        boolean isInsufficient = isInsufficientMaterial();
+        if (isInsufficient) {
+            System.out.println("DEBUG: Insufficient material detected");
+        }
+        
         // Check for stalemate of the opponent (the player whose turn it is now)
         // After a move, currentPlayer has been switched to the opponent
-        return isThreefoldRepetition() || isFiftyMoveRule() || isInsufficientMaterial() || ChessRules.isInStalemate(board, currentPlayer);
+        // But we need to check if the opponent (currentPlayer) has any legal moves
+        // This should only trigger if the opponent is in stalemate (no legal moves and not in check)
+        boolean isInStalemate = ChessRules.isInStalemate(board, currentPlayer);
+        
+        // Additional safety check: only trigger stalemate if the player has actually moved
+        // and there are no legal moves available
+        boolean hasLegalMoves = false;
+        if (isInStalemate) {
+            System.out.println("DEBUG: Initial stalemate check returned true for player: " + currentPlayer);
+            
+            // Double-check by scanning all pieces for the current player
+            for (int row = 0; row < 8; row++) {
+                for (int col = 0; col < 8; col++) {
+                    Piece piece = board[row][col];
+                    if (piece != null && piece.getColor() == currentPlayer) {
+                        List<int[]> validMoves = ChessRules.getValidMoves(board, row, col, currentPlayer == Piece.Color.WHITE);
+                        if (validMoves != null && !validMoves.isEmpty()) {
+                            hasLegalMoves = true;
+                            System.out.println("DEBUG: Found legal moves for piece at (" + row + "," + col + ") - type: " + piece.getType() + ", color: " + piece.getColor());
+                            break;
+                        }
+                    }
+                }
+                if (hasLegalMoves) break;
+            }
+            
+            // If we found legal moves, it's not actually stalemate
+            if (hasLegalMoves) {
+                isInStalemate = false;
+                System.out.println("DEBUG: False stalemate detected - legal moves found for player: " + currentPlayer);
+            } else {
+                System.out.println("DEBUG: Confirmed stalemate - no legal moves found for player: " + currentPlayer);
+            }
+        }
+        
+        // Debug logging to understand when draw is triggered
+        if (isInStalemate) {
+            System.out.println("DEBUG: Stalemate detected for player: " + currentPlayer);
+            System.out.println("DEBUG: Move history size: " + moveHistory.size());
+            System.out.println("DEBUG: Half move clock: " + halfMoveClock);
+        }
+        
+        // TEMPORARILY DISABLE STALEMATE TO TEST - uncomment the line below to disable stalemate
+        // isInStalemate = false;
+        
+        boolean isDraw = isThreefold || isFiftyMove || isInsufficient || isInStalemate;
+        
+        if (isDraw) {
+            System.out.println("DEBUG: Draw detected - threefold: " + isThreefold + ", fiftyMove: " + isFiftyMove + ", insufficient: " + isInsufficient + ", stalemate: " + isInStalemate);
+        }
+        
+        return isDraw;
     }
 
     // Get move notation for move history
@@ -611,6 +708,12 @@ public class ChessGame {
     private Piece.Color navigationPlayer;
     private boolean isNavigating = false;
     
+    // Promotion tracking
+    private boolean isPromoting = false;
+    private int promotionRow = -1;
+    private int promotionCol = -1;
+    private Piece.Color promotingPlayer;
+    
     public boolean canGoBack() {
         // Can go back if:
         // 1. We're at current game state and there are moves (can go to position before last move)
@@ -643,6 +746,11 @@ public class ChessGame {
     public void goBack() {
         if (canGoBack()) {
             System.out.println("DEBUG: goBack() called - currentMoveIndex: " + currentMoveIndex + ", moveHistory.size(): " + moveHistory.size());
+            
+            // Add bounds checking to prevent invalid index access
+            if (currentMoveIndex < -1 || currentMoveIndex >= moveHistory.size()) {
+                currentMoveIndex = -1; // Reset to safe state
+            }
             
             // If we're at current game state and there are moves, go to the position before the last move
             if (currentMoveIndex == -1 && moveHistory.size() > 0) {
@@ -739,6 +847,8 @@ public class ChessGame {
         }
         
         // Update current player based on move count
+        // After moveIndex moves, if moveIndex is even, it's White's turn (0, 2, 4...)
+        // If moveIndex is odd, it's Black's turn (1, 3, 5...)
         navigationPlayer = (moveIndex % 2 == 0) ? Piece.Color.WHITE : Piece.Color.BLACK;
         
         // Debug: Print the board state after restoration
@@ -795,6 +905,7 @@ public class ChessGame {
             }
             
             // Restore game state
+            // After all moves have been replayed, the current player should be the opposite of the last move's player
             currentPlayer = (moveHistory.size() % 2 == 0) ? Piece.Color.WHITE : Piece.Color.BLACK;
             gameOver = false;
             winner = null;
@@ -807,302 +918,27 @@ public class ChessGame {
     }
     
     private void executeMoveFromRecord(MoveRecord record) {
+        int fromRow = record.getFromRow();
+        int fromCol = record.getFromCol();
+        int toRow = record.getToRow();
+        int toCol = record.getToCol();
+        Piece movingPiece = record.getMovingPiece();
+        Piece capturedPiece = record.getCapturedPiece();
+        
         // Handle castling
         if (record.isCastling()) {
-            handleCastlingMove(record);
-        }
-        // Handle en passant
-        else if (record.isEnPassant()) {
-            handleEnPassantMove(record);
-        }
-        // Handle normal moves
-        else {
-            handleNormalMove(record);
-        }
-    }
-    
-    // Navigate back to previous move (for viewing, not undoing)
-    private void navigateToPreviousMove() {
-        if (moveHistory.isEmpty()) {
-            return;
-        }
-        
-        // If we're at current game state, go to the last move
-        if (currentMoveIndex == -1) {
-            currentMoveIndex = moveHistory.size() - 1;
-        } else if (currentMoveIndex > 0) {
-            currentMoveIndex--;
-        } else {
-            // Already at the first move, can't go back further
-            return;
-        }
-        
-        // Restore board to the specified move
-        restoreBoardToMove(currentMoveIndex);
-        
-        // Update navigation player based on move count
-        navigationPlayer = (currentMoveIndex % 2 == 0) ? Piece.Color.WHITE : Piece.Color.BLACK;
-        
-        // Debug: Print the board state after navigation
-        System.out.println("Board state after navigating to move " + currentMoveIndex + ":");
-        printBoardState();
-        System.out.println("Updated currentMoveIndex to: " + currentMoveIndex + " (moveHistory.size(): " + moveHistory.size() + ")");
-    }
-    
-    private void undoNormalMove(MoveRecord record) {
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        Piece movingPiece = record.getMovingPiece();
-        Piece capturedPiece = record.getCapturedPiece();
-        
-        // Move the piece back to its original position
-        board[fromRow][fromCol] = movingPiece;
-        board[toRow][toCol] = null;
-        movingPiece.setHasMoved(false);
-        
-        // Restore captured piece if there was one
-        if (capturedPiece != null) {
-            board[toRow][toCol] = capturedPiece;
-        }
-        
-        // Debug: Print the board state after undo
-        System.out.println("Board state after undoing normal move:");
-        printBoardState();
-    }
-    
-    private void undoCastlingMove(MoveRecord record) {
-        int row = record.getPlayerColor() == Piece.Color.WHITE ? 7 : 0;
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        
-        // Determine if kingside or queenside
-        boolean kingside = toCol > fromCol;
-        
-        if (kingside) {
-            // Undo kingside castling
-            // Move king back from g-file to e-file
-            Piece king = board[row][6];
-            board[row][4] = king;
-            board[row][6] = null;
-            king.setHasMoved(false);
-            
-            // Move rook back from f-file to h-file
-            Piece rook = board[row][5];
-            board[row][7] = rook;
-            board[row][5] = null;
-            rook.setHasMoved(false);
-        } else {
-            // Undo queenside castling
-            // Move king back from c-file to e-file
-            Piece king = board[row][2];
-            board[row][4] = king;
-            board[row][2] = null;
-            king.setHasMoved(false);
-            
-            // Move rook back from d-file to a-file
-            Piece rook = board[row][3];
-            board[row][0] = rook;
-            board[row][3] = null;
-            rook.setHasMoved(false);
-        }
-        
-        // Debug: Print the board state after undo
-        System.out.println("Board state after undoing castling move:");
-        printBoardState();
-    }
-    
-    private void undoEnPassantMove(MoveRecord record) {
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        Piece movingPiece = record.getMovingPiece();
-        
-        // Move the pawn back to its original position
-        board[fromRow][fromCol] = movingPiece;
-        board[toRow][toCol] = null;
-        movingPiece.setHasMoved(false);
-        
-        // Restore the captured pawn (en passant)
-        int direction = (toRow - fromRow) > 0 ? 1 : -1;
-        int capturedRow = fromRow + direction;
-        int capturedCol = toCol;
-        Piece capturedPawn = new Piece(record.getPlayerColor() == Piece.Color.WHITE ? Piece.Color.BLACK : Piece.Color.WHITE, Piece.Type.PAWN);
-        board[capturedRow][capturedCol] = capturedPawn;
-        
-        // Debug: Print the board state after undo
-        System.out.println("Board state after undoing en passant move:");
-        printBoardState();
-    }
-    
-    private void handleNormalMove(MoveRecord record) {
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        Piece movingPiece = record.getMovingPiece();
-        Piece capturedPiece = record.getCapturedPiece();
-        
-        // Clear the destination square first to prevent duplicates
-        board[toRow][toCol] = null;
-        
-        // Move the piece
-        board[toRow][toCol] = movingPiece;
-        board[fromRow][fromCol] = null;
-        movingPiece.setHasMoved(true);
-        
-        // Debug: Print the board state after the move
-        System.out.println("Board state after normal move:");
-        printBoardState();
-    }
-    
-    private void handleCastlingMove(MoveRecord record) {
-        int row = record.getPlayerColor() == Piece.Color.WHITE ? 7 : 0;
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        
-        // Determine if kingside or queenside
-        boolean kingside = toCol > fromCol;
-        
-        if (kingside) {
-            // Kingside castling
-            // Move king from e-file to g-file
-            Piece king = board[row][4];
-            board[row][6] = king;
-            board[row][4] = null;
-            king.setHasMoved(true);
-            
-            // Move rook from h-file to f-file
-            Piece rook = board[row][7];
-            board[row][5] = rook;
-            board[row][7] = null;
-            rook.setHasMoved(true);
-        } else {
-            // Queenside castling
-            // Move king from e-file to c-file
-            Piece king = board[row][4];
-            board[row][2] = king;
-            board[row][4] = null;
-            king.setHasMoved(true);
-            
-            // Move rook from a-file to d-file
-            Piece rook = board[row][0];
-            board[row][3] = rook;
-            board[row][0] = null;
-            rook.setHasMoved(true);
-        }
-        
-        // Debug: Print the board state after the move
-        System.out.println("Board state after castling move:");
-        printBoardState();
-    }
-    
-    private void handleEnPassantMove(MoveRecord record) {
-        int fromRow = record.getFromRow();
-        int fromCol = record.getFromCol();
-        int toRow = record.getToRow();
-        int toCol = record.getToCol();
-        Piece movingPiece = record.getMovingPiece();
-        
-        // Move the pawn
-        board[toRow][toCol] = movingPiece;
-        board[fromRow][fromCol] = null;
-        movingPiece.setHasMoved(true);
-        
-        // Remove the captured pawn (en passant)
-        int direction = (toRow - fromRow) > 0 ? 1 : -1;
-        int capturedRow = fromRow + direction;
-        int capturedCol = toCol;
-        board[capturedRow][capturedCol] = null;
-        
-        // Debug: Print the board state after the move
-        System.out.println("Board state after en passant move:");
-        printBoardState();
-    }
-    
-    private void executeMoveFromNotation(String move) {
-        // Simple move notation parser (e.g., "e2e4", "Nf3", "O-O")
-        if (move.equals("O-O") || move.equals("O-O-O")) {
-            // Handle castling
-            handleCastlingNotation(move);
-        } else if (move.length() == 4 || move.length() == 5) {
-            // Handle standard moves (e.g., "e2e4", "Nf3x")
-            parseStandardMove(move);
-        }
-    }
-    
-    private void handleCastlingNotation(String move) {
-        int row = currentPlayer == Piece.Color.WHITE ? 7 : 0;
-        
-        if (move.equals("O-O")) {
-            // Kingside castling
-            // Move king from e-file to g-file
-            Piece king = board[row][4];
-            board[row][6] = king;
-            board[row][4] = null;
-            king.setHasMoved(true);
-            
-            // Move rook from h-file to f-file
-            Piece rook = board[row][7];
-            board[row][5] = rook;
-            board[row][7] = null;
-            rook.setHasMoved(true);
-        } else {
-            // Queenside castling
-            // Move king from e-file to c-file
-            Piece king = board[row][4];
-            board[row][2] = king;
-            board[row][4] = null;
-            king.setHasMoved(true);
-            
-            // Move rook from a-file to d-file
-            Piece rook = board[row][0];
-            board[row][3] = rook;
-            board[row][0] = null;
-            rook.setHasMoved(true);
-        }
-    }
-    
-    private void parseStandardMove(String move) {
-        // Extract source and destination squares
-        char fromFile = move.charAt(0);
-        char fromRank = move.charAt(1);
-        char toFile = move.charAt(2);
-        char toRank = move.charAt(3);
-        
-        int fromCol = fromFile - 'a';
-        int fromRow = 8 - Character.getNumericValue(fromRank);
-        int toCol = toFile - 'a';
-        int toRow = 8 - Character.getNumericValue(toRank);
-        
-        // Debug: Print the move being parsed
-        System.out.println("Parsing move: " + move + " from (" + fromRow + "," + fromCol + ") to (" + toRow + "," + toCol + ")");
-        
-        // Move the piece
-        Piece piece = board[fromRow][fromCol];
-        if (piece != null) {
-            // Debug: Print what piece is being moved
-            System.out.println("Moving piece: " + piece.getColor() + " " + piece.getType());
-            
-            // Clear the destination square first to prevent duplicates
-            board[toRow][toCol] = null;
-            
-            // Move the piece
-            board[toRow][toCol] = piece;
-            board[fromRow][fromCol] = null;
-            piece.setHasMoved(true);
-            
-            // Debug: Print the board state after the move
-            System.out.println("Board state after move:");
-            printBoardState();
-        } else {
-            System.out.println("ERROR: No piece found at source position (" + fromRow + "," + fromCol + ")");
+            boolean kingside = toCol > fromCol;
+            int row = fromRow;
+            int rookCol = kingside ? 7 : 0;
+            int newRookCol = kingside ? 5 : 3;
+
+            // Move rook
+            Piece rook = board[row][rookCol];
+            if (rook != null) {
+                board[row][newRookCol] = rook;
+                board[row][rookCol] = null;
+                rook.setHasMoved(true);
+            }
         }
     }
 
@@ -1154,5 +990,40 @@ public class ChessGame {
     // Check if current player is in check
     public boolean isInCheck() {
         return ChessRules.isInCheck(board, currentPlayer);
+    }
+    
+    // Promotion methods
+    public boolean isPromoting() {
+        return isPromoting;
+    }
+    
+    public int getPromotionRow() {
+        return promotionRow;
+    }
+    
+    public int getPromotionCol() {
+        return promotionCol;
+    }
+    
+    public Piece.Color getPromotingPlayer() {
+        return promotingPlayer;
+    }
+    
+    public void setPromotionComplete(Piece.Type promotionType) {
+        if (isPromoting && promotionRow >= 0 && promotionCol >= 0) {
+            // Replace the pawn with the promoted piece
+            Piece pawn = board[promotionRow][promotionCol];
+            if (pawn != null && pawn.getType() == Piece.Type.PAWN) {
+                board[promotionRow][promotionCol] = new Piece(pawn.getColor(), promotionType);
+            }
+            // Reset promotion state
+            isPromoting = false;
+            promotionRow = -1;
+            promotionCol = -1;
+            promotingPlayer = null;
+            
+            // Switch player after promotion is complete
+            currentPlayer = currentPlayer == Piece.Color.WHITE ? Piece.Color.BLACK : Piece.Color.WHITE;
+        }
     }
 }

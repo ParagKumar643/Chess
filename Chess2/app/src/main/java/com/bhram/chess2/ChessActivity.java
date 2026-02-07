@@ -114,9 +114,9 @@ public class ChessActivity extends AppCompatActivity {
                 params.columnSpec = GridLayout.spec(col,1f);
                 square.setLayoutParams(params);
                 
-                // Set background color using blue theme
+                // Set background color using blue and white theme
                 boolean isLightSquare = (row + col) % 2 == 0;
-                int bgColor = isLightSquare ? Color.parseColor("#64B5F6") : Color.parseColor("#1976D2"); // Blue light and dark
+                int bgColor = isLightSquare ? Color.parseColor("#FFFFFF") : Color.parseColor("#1976D2"); // White and dark blue
                 square.setBackgroundColor(bgColor);
                 
                 // Create coordinate label (only for edge squares)
@@ -126,7 +126,7 @@ public class ChessActivity extends AppCompatActivity {
                     coordLabel.setTypeface(null, Typeface.BOLD);
                     
                     // Set text color for better contrast
-                    int textColor = isLightSquare ? Color.parseColor("#B58863") : Color.parseColor("#F0D9B5");
+                    int textColor = isLightSquare ? Color.parseColor("#1976D2") : Color.parseColor("#FFFFFF");
                     coordLabel.setTextColor(textColor);
                     
                     RelativeLayout.LayoutParams labelParams = new RelativeLayout.LayoutParams(
@@ -321,6 +321,11 @@ public class ChessActivity extends AppCompatActivity {
     }
 
     private void onSquareClick(int row, int col) {
+        // Add bounds checking
+        if (row < 0 || row >= 8 || col < 0 || col >= 8) {
+            return;
+        }
+
         // If in navigation mode, clicking anywhere exits navigation
         if (game.isNavigating()) {
             exitNavigation();
@@ -328,6 +333,12 @@ public class ChessActivity extends AppCompatActivity {
         }
 
         if (game.isGameOver()) {
+            return;
+        }
+
+        // Check if we're in the middle of a promotion
+        if (game.isPromoting()) {
+            // If promotion is in progress, ignore clicks until promotion is complete
             return;
         }
 
@@ -342,6 +353,13 @@ public class ChessActivity extends AppCompatActivity {
             boolean moveSuccessful = game.movePiece(row, col);
 
             if (moveSuccessful) {
+                // Check if this move triggered a promotion
+                if (game.isPromoting()) {
+                    // Show promotion dialog
+                    showPromotionDialog();
+                    return; // Don't update board yet, wait for promotion selection
+                }
+                
                 // Determine if this was a capture move by comparing board states
                 isCaptureMove = detectCaptureMove(game.getSelectedRow(), game.getSelectedCol(), row, col);
                 
@@ -411,9 +429,9 @@ public class ChessActivity extends AppCompatActivity {
             for (int col = 0; col < 8; col++) {
                 ImageView pieceView = pieceViews[col][row];
                 if (pieceView != null) {
-                    // Reset background color based on square position (using blue theme)
+                    // Reset background color based on square position (using classic theme)
                     boolean isLightSquare = (row + col) % 2 == 0;
-                    int bgColor = isLightSquare ? Color.parseColor("#64B5F6") : Color.parseColor("#1976D2");
+                    int bgColor = isLightSquare ? Color.parseColor("#F0D9B5") : Color.parseColor("#B58863");
                     // Note: We can't easily change the background of the RelativeLayout parent here
                     // The background is set in createBoardSquares and should remain consistent
                     
@@ -665,12 +683,20 @@ public class ChessActivity extends AppCompatActivity {
     }
     
     private void startPlayerClock(Piece.Color player) {
-        if (!isClockRunning) {
-            isClockRunning = true;
-            currentPlayerInClock = player;
-            clockRunnable = new Runnable() {
-                @Override
-                public void run() {
+        // Always stop current clock first to prevent conflicts
+        stopClock();
+        isClockRunning = true;
+        currentPlayerInClock = player;
+        
+        clockRunnable = new Runnable() {
+            @Override
+            public void run() {
+                // Double-check if still running to prevent race conditions
+                if (!isClockRunning) {
+                    return;
+                }
+                
+                try {
                     if (player == Piece.Color.WHITE) {
                         if (player1Time > 0) {
                             player1Time -= 1000; // Decrease by 1 second
@@ -696,10 +722,13 @@ public class ChessActivity extends AppCompatActivity {
                             }
                         }
                     }
+                } catch (Exception e) {
+                    android.util.Log.e("ChessGame", "Timer error: " + e.getMessage());
+                    stopClock();
                 }
-            };
-            clockHandler.post(clockRunnable);
-        }
+            }
+        };
+        clockHandler.post(clockRunnable);
     }
     
     private void stopClock() {
@@ -782,30 +811,30 @@ public class ChessActivity extends AppCompatActivity {
     private void playMoveSound() {
         android.util.Log.d("ChessSound", "playMoveSound called");
         if (moveSound != null) {
-            moveSound.stop();
-            moveSound.prepareAsync();
-            moveSound.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mp) {
-                    android.util.Log.d("ChessSound", "Starting move sound playback");
-                    mp.start();
+            try {
+                if (moveSound.isPlaying()) {
+                    moveSound.stop();
                 }
-            });
+                moveSound.seekTo(0);
+                moveSound.start();
+            } catch (Exception e) {
+                android.util.Log.e("ChessSound", "Error playing move sound: " + e.getMessage());
+            }
         }
     }
     
     private void playCaptureSound() {
         android.util.Log.d("ChessSound", "playCaptureSound called");
         if (captureSound != null) {
-            captureSound.stop();
-            captureSound.prepareAsync();
-            captureSound.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mp) {
-                    android.util.Log.d("ChessSound", "Starting capture sound playback");
-                    mp.start();
+            try {
+                if (captureSound.isPlaying()) {
+                    captureSound.stop();
                 }
-            });
+                captureSound.seekTo(0);
+                captureSound.start();
+            } catch (Exception e) {
+                android.util.Log.e("ChessSound", "Error playing capture sound: " + e.getMessage());
+            }
         }
     }
     
@@ -972,6 +1001,23 @@ public class ChessActivity extends AppCompatActivity {
         getSupportFragmentManager().beginTransaction()
             .add(R.id.fragment_container, gameOverFragment)
             .commit();
+    }
+    
+    private void showPromotionDialog() {
+        // Show the promotion dialog
+        PawnPromotionDialog.showPromotionDialog(this, game.getPromotingPlayer(), new PawnPromotionDialog.OnPromotionSelectedListener() {
+            @Override
+            public void onPromotionSelected(Piece.Type promotionType) {
+                // Complete the promotion
+                game.setPromotionComplete(promotionType);
+                
+                // Update the board to show the promoted piece
+                updateBoard();
+                
+                // Switch player after promotion is complete
+                switchPlayer();
+            }
+        });
     }
     
     private String formatTime(long timeInMillis) {

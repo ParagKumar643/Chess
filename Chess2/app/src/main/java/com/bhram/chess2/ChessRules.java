@@ -354,11 +354,12 @@ public class ChessRules {
      * Checks if the game is in stalemate
      */
     public static boolean isStalemate(Piece[][] board, boolean isWhiteTurn) {
+        // First check if king is in check - if so, it's checkmate, not stalemate
         if (isKingInCheck(board, isWhiteTurn)) {
             return false; // Not stalemate if in check
         }
         
-        // Check if any legal move is available
+        // Check if any legal move is available for the current player
         for (int startRow = 0; startRow < 8; startRow++) {
             for (int startCol = 0; startCol < 8; startCol++) {
                 Piece piece = board[startRow][startCol];
